@@ -1,0 +1,2986 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><title>Enterprise Cloud Security Platform — Executive Edition</title><style>
+:root{--bg:#0b1020;--panel:#11182d;--panel2:#17213d;--text:#e8edf7;--muted:#a8b3cf;--line:#2a3659;--accent:#7c3aed;--accent2:#22d3ee}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(180deg,#09101f,#0b1020 30%,#0d1427);color:var(--text)}a{color:var(--accent2);text-decoration:none}.layout{display:grid;grid-template-columns:320px minmax(0,1fr);min-height:100vh}.sidebar{position:sticky;top:0;height:100vh;overflow:auto;padding:22px 18px;background:rgba(10,15,30,.96);border-right:1px solid var(--line)}.brand{font-weight:800;font-size:18px;margin-bottom:6px}.subbrand{color:var(--muted);font-size:12px;margin-bottom:18px}.toc-main,.toc-sub{display:block;padding:7px 9px;border-radius:8px;color:#d7def0;font-size:13px}.toc-sub{padding-left:22px;color:var(--muted)}.toc-main:hover,.toc-sub:hover{background:var(--panel2);color:white}main{padding:34px clamp(22px,4vw,64px) 80px;max-width:1400px;width:100%}.hero{padding:42px;border:1px solid var(--line);border-radius:24px;background:radial-gradient(circle at top right,rgba(124,58,237,.25),transparent 35%),var(--panel);margin-bottom:30px}.hero h1{margin-top:0;font-size:clamp(32px,5vw,58px);line-height:1.05}.hero p{color:var(--muted);font-size:18px;max-width:900px}.badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.badge{padding:8px 12px;border-radius:999px;background:#18213d;border:1px solid #2d3a61;font-size:13px}article,.visual-section{background:rgba(17,24,45,.82);border:1px solid var(--line);border-radius:20px;padding:clamp(22px,3vw,42px);box-shadow:0 18px 60px rgba(0,0,0,.18)}h1,h2,h3{scroll-margin-top:24px}h1{margin-top:54px;font-size:34px;border-bottom:1px solid var(--line);padding-bottom:12px}h2{margin-top:36px;font-size:25px;color:#c4b5fd}h3{margin-top:28px;font-size:19px;color:#a5f3fc}p,li{line-height:1.68;color:#d8deed}ul{padding-left:24px}hr{border:none;border-top:1px solid var(--line);margin:34px 0}pre{overflow:auto;padding:18px;border-radius:14px;background:#070b16;border:1px solid #243052;color:#d9e4ff;line-height:1.5}code{font-family:"SFMono-Regular",Consolas,monospace}.visual-section{margin-bottom:30px}.graph-grid{display:grid;gap:24px}.graph-card{overflow:auto;padding:18px;border-radius:16px;background:#0b1122;border:1px solid #243052}svg{width:100%;min-width:760px;height:auto}.svg-title{fill:#e8edf7;font-size:24px;font-weight:700}.svg-box{fill:#17213d;stroke:#7c3aed;stroke-width:2}.svg-text{fill:#edf2ff;font-size:16px;font-weight:600}.svg-line{stroke:#64748b;stroke-width:2}.svg-arrow{fill:#22d3ee}@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}main{padding:20px}.hero{padding:28px}}@media print{.sidebar{display:none}.layout{display:block}body{background:white;color:#111}article,.visual-section,.hero{box-shadow:none;background:white;border:1px solid #ccc}p,li,h1,h2,h3{color:#111!important}pre{white-space:pre-wrap}}
+
+.audit-banner{margin:0 0 30px;padding:26px;border-radius:20px;border:1px solid #33446f;background:linear-gradient(135deg,rgba(34,211,238,.10),rgba(124,58,237,.12))}.audit-banner h2{margin-top:0}.finding-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:20px 0}.finding{padding:18px;border:1px solid #2a3659;border-radius:14px;background:#0c1428}.finding strong{display:block;color:#a5f3fc;margin-bottom:7px}.matrix{display:grid;grid-template-columns:220px repeat(4,minmax(120px,1fr));gap:2px;background:#2a3659;border:1px solid #2a3659;border-radius:14px;overflow:hidden;min-width:760px}.matrix div{padding:12px;background:#10182d}.matrix .head{font-weight:700;background:#17213d;color:#c4b5fd}.matrix .good{background:rgba(34,197,94,.13)}.matrix .warn{background:rgba(245,158,11,.13)}.matrix .bad{background:rgba(239,68,68,.13)}.gate-row{display:grid;grid-template-columns:160px 1fr 130px;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid #243052}.bar{height:12px;border-radius:999px;background:#222d49;overflow:hidden}.bar>span{display:block;height:100%;background:linear-gradient(90deg,#7c3aed,#22d3ee)}.status-pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#17213d;border:1px solid #33446f;font-size:12px;text-align:center}.callout{padding:18px;border-left:4px solid #22d3ee;background:#0c1428;border-radius:10px;margin:18px 0}.small{font-size:13px;color:#a8b3cf}.source-list li{word-break:break-word}
+
+.graph-card{position:relative;padding:22px 22px 18px;background:linear-gradient(180deg,#0d1428,#09101f);box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 18px 46px rgba(0,0,0,.22)}
+.graph-card svg{display:block;width:100%;min-width:0;max-width:100%;margin:auto}
+.svg-box{fill:#17213d;stroke:#7c3aed;stroke-width:2;filter:url(#shadow)}
+.svg-box-alt{fill:#10243a;stroke:#22d3ee;stroke-width:2;filter:url(#shadow)}
+.svg-box-soft{fill:#151d34;stroke:#64748b;stroke-width:1.5}
+.svg-text{fill:#f4f7ff;font-size:17px;font-weight:700}
+.svg-sub{fill:#a8b3cf;font-size:13px;font-weight:500}
+.svg-step{fill:#22d3ee;font-size:12px;font-weight:800;letter-spacing:.08em}
+.svg-title{fill:#f4f7ff;font-size:28px;font-weight:800}
+.svg-line{stroke:#64748b;stroke-width:2.4;stroke-linecap:round}
+.svg-line-accent{stroke:#22d3ee;stroke-width:3;stroke-linecap:round}
+.svg-arrow{fill:#22d3ee}
+.svg-arrow-muted{fill:#64748b}
+.svg-lane{fill:#0b1122;stroke:#243052;stroke-width:1.4}
+.svg-label{fill:#c4b5fd;font-size:14px;font-weight:800;letter-spacing:.05em}
+@media(max-width:700px){.graph-card{padding:14px}.svg-title{font-size:22px}.svg-text{font-size:15px}.svg-sub{font-size:12px}}
+</style><style>
+/* Executive Edition enhancements */
+:root{--exec-blue:#38bdf8;--exec-green:#34d399;--exec-amber:#fbbf24;--exec-red:#fb7185;--exec-ink:#07101f}
+body{background:radial-gradient(circle at 85% 0%,rgba(56,189,248,.09),transparent 27%),linear-gradient(180deg,#07101f,#0b1224 42%,#0d1427)}
+.sidebar{width:300px;background:linear-gradient(180deg,rgba(7,16,31,.99),rgba(10,17,34,.98));box-shadow:18px 0 60px rgba(0,0,0,.2)}
+.brand{font-size:19px;letter-spacing:-.02em}.subbrand{text-transform:uppercase;letter-spacing:.12em;font-size:10px;color:#7dd3fc}
+.toc-main{font-weight:650}.toc-sub{font-size:12px}
+main{max-width:1480px}
+.hero{position:relative;overflow:hidden;padding:54px 52px 46px;background:radial-gradient(circle at 88% 14%,rgba(34,211,238,.20),transparent 28%),radial-gradient(circle at 72% 0%,rgba(124,58,237,.28),transparent 34%),linear-gradient(135deg,#111a31,#0b1327 70%);border-color:#33466f;box-shadow:0 28px 90px rgba(0,0,0,.30)}
+.hero:before{content:"EXECUTIVE EDITION";display:inline-block;margin-bottom:18px;padding:7px 11px;border-radius:999px;border:1px solid rgba(125,211,252,.35);background:rgba(14,165,233,.09);color:#7dd3fc;font-size:11px;font-weight:850;letter-spacing:.16em}
+.hero h1{max-width:1060px;margin:0;border:0;padding:0;font-size:clamp(38px,5.7vw,72px);letter-spacing:-.045em;line-height:.98}
+.hero p{max-width:980px;font-size:19px;line-height:1.55;color:#c4cede}
+.badges{margin-top:26px}.badge{background:rgba(15,23,42,.62);border-color:#3a4a70;color:#dbeafe}
+.exec-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin:-14px 0 26px;padding:14px 16px;border:1px solid #293b60;border-radius:16px;background:rgba(9,17,34,.88);backdrop-filter:blur(12px)}
+.exec-toolbar .toolbar-label{font-size:12px;color:#9fb1cc}.exec-actions{display:flex;gap:10px;flex-wrap:wrap}.exec-btn{border:1px solid #35517b;background:#13213a;color:#eaf4ff;border-radius:10px;padding:9px 13px;font-weight:750;cursor:pointer}.exec-btn.primary{background:linear-gradient(135deg,#2563eb,#0891b2);border-color:transparent}.exec-btn:hover{transform:translateY(-1px)}
+.exec-overview{margin-bottom:30px;padding:30px;border:1px solid #304467;border-radius:22px;background:linear-gradient(180deg,rgba(17,27,50,.96),rgba(10,18,35,.96));box-shadow:0 20px 65px rgba(0,0,0,.24)}
+.exec-kicker{color:#7dd3fc;font-size:11px;font-weight:850;letter-spacing:.17em;text-transform:uppercase}.exec-overview h2{margin:8px 0 8px;color:#f8fbff;font-size:30px;letter-spacing:-.025em}.exec-lead{margin:0 0 22px;max-width:1000px;color:#aebbd0}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.kpi{min-height:138px;padding:18px;border:1px solid #2d4268;border-radius:16px;background:linear-gradient(145deg,#111d35,#0b1428)}.kpi .num{display:block;margin:7px 0 5px;font-size:28px;font-weight:900;letter-spacing:-.04em}.kpi .label{font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.09em;color:#8ea3c3}.kpi p{margin:0;font-size:13px;line-height:1.45;color:#9eabc0}.kpi.blue .num{color:#7dd3fc}.kpi.green .num{color:#6ee7b7}.kpi.amber .num{color:#fde68a}.kpi.purple .num{color:#c4b5fd}
+.exec-decision{display:grid;grid-template-columns:1.25fr .75fr;gap:16px;margin-top:16px}.exec-panel{padding:20px;border:1px solid #2d4268;border-radius:16px;background:#0b1428}.exec-panel h3{margin:0 0 14px;color:#eef6ff;font-size:16px}.decision-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid #233454}.decision-row:last-child{border-bottom:0}.decision-row span:first-child{color:#b7c3d6}.decision-status{padding:5px 9px;border-radius:999px;font-size:11px;font-weight:850;white-space:nowrap}.ready{background:rgba(52,211,153,.12);color:#6ee7b7;border:1px solid rgba(52,211,153,.28)}.gated{background:rgba(251,191,36,.12);color:#fde68a;border:1px solid rgba(251,191,36,.28)}.planned{background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.28)}
+.exec-ring{display:flex;align-items:center;gap:18px}.ring{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#38bdf8 0 78%,#1f2d49 78%);position:relative}.ring:after{content:"";position:absolute;inset:12px;border-radius:50%;background:#0b1428}.ring strong{position:relative;z-index:1;font-size:25px}.ring-copy p{margin:3px 0;font-size:13px;color:#9eabc0}
+article,.visual-section,.audit-banner{border-color:#2c3e61;box-shadow:0 20px 65px rgba(0,0,0,.18)}
+.visual-section>h1,.audit-banner>h1,article>h1{font-size:32px;letter-spacing:-.025em}
+.graph-card{border-color:#304567;background:linear-gradient(180deg,#0d172c,#08111f);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 20px 55px rgba(0,0,0,.25)}
+.graph-card h2{font-size:21px;color:#dbeafe}.matrix{border-color:#33496e;background:#33496e}.matrix .head{background:#182640;color:#dbeafe}
+.finding{transition:.2s ease}.finding:hover{transform:translateY(-2px);border-color:#45618e}
+.exec-note{margin-top:17px;padding:13px 15px;border-radius:12px;border:1px solid rgba(56,189,248,.25);background:rgba(56,189,248,.06);color:#bfd8ed;font-size:13px}
+body.executive-only article h2~*,body.executive-only article h3~*{display:none}body.executive-only .toc-sub{display:none}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.exec-decision{grid-template-columns:1fr}}
+@media(max-width:700px){.hero{padding:34px 26px}.kpi-grid{grid-template-columns:1fr}.exec-overview{padding:22px}.exec-ring{align-items:flex-start}.sidebar{width:auto}.layout{grid-template-columns:1fr}}
+@media print{.exec-toolbar{display:none}.exec-overview{break-inside:avoid}.kpi-grid{grid-template-columns:repeat(4,1fr)}.sidebar{display:none}.layout{display:block}}
+</style></head><body><div class="layout"><aside class="sidebar"><div class="brand">Enterprise Cloud Security Platform</div><div class="subbrand">Discovery • Reporting • Migration</div><a class="toc-main" href="#executive-command-view">Executive Command View</a>
+<a class="toc-main" href="#enterprise-cloud-security-discovery-reporting-migration-platform">Enterprise Cloud Security Discovery, Reporting &amp; Migration Platform</a><a class="toc-main" href="#document-review-corrections-missing-capabilities-architecture-decisions">Document Review: Corrections, Missing Capabilities &amp; Architecture Decisions</a><a class="toc-main" href="#additional-decision-graphics">Additional Decision Graphics</a><a class="toc-sub" href="#coverage-and-replacement-decision-matrix">Coverage and Replacement Decision Matrix</a><a class="toc-sub" href="#migration-gate-scorecard">Migration Gate Scorecard</a><a class="toc-main" href="#missing-production-requirements-added-to-the-design">Missing Production Requirements Added to the Design</a><a class="toc-sub" href="#important-terminology-correction">Important Terminology Correction</a><a class="toc-sub" href="#reporting-fields-still-required">Reporting Fields Still Required</a><a class="toc-main" href="#official-validation-notes">Official Validation Notes</a><a class="toc-main" href="#visual-architecture-workflow-graphs">Visual Architecture &amp; Workflow Graphs</a><a class="toc-main" href="#readme-part-1">README Part 1</a><a class="toc-sub" href="#enterprise-cloud-security-discovery-reporting-migration-platform-2">Enterprise Cloud Security Discovery, Reporting &amp; Migration Platform</a><a class="toc-main" href="#table-of-contents">Table of Contents</a><a class="toc-main" href="#enterprise-cloud-security-discovery-reporting-migration-platform-3">Enterprise Cloud Security Discovery, Reporting &amp; Migration Platform</a><a class="toc-sub" href="#working-demo-enterprise-product">Working Demo → Enterprise Product</a><a class="toc-main" href="#executive-summary">Executive Summary</a><a class="toc-main" href="#product-vision">Product Vision</a><a class="toc-sub" href="#1-vendor-neutral">1. Vendor Neutral</a><a class="toc-sub" href="#2-discovery-first">2. Discovery First</a><a class="toc-sub" href="#3-normalize-everything">3. Normalize Everything</a><a class="toc-sub" href="#4-correlate-enterprise-assets">4. Correlate Enterprise Assets</a><a class="toc-sub" href="#5-validate-before-migrating">5. Validate Before Migrating</a><a class="toc-sub" href="#6-enterprise-reporting">6. Enterprise Reporting</a><a class="toc-main" href="#why-this-framework-matters">Why This Framework Matters</a><a class="toc-main" href="#business-justification">Business Justification</a><a class="toc-main" href="#working-demo">Working Demo</a><a class="toc-sub" href="#aws-onboarding-discovery">AWS Onboarding Discovery</a><a class="toc-sub" href="#image-vulnerability-reporting">Image Vulnerability Reporting</a><a class="toc-sub" href="#host-vulnerability-reporting">Host Vulnerability Reporting</a><a class="toc-sub" href="#runtime-discovery">Runtime Discovery</a><a class="toc-sub" href="#dashboard-generation">Dashboard Generation</a><a class="toc-main" href="#repository-philosophy">Repository Philosophy</a><a class="toc-main" href="#high-level-architecture">High-Level Architecture</a><a class="toc-main" href="#repository-layout">Repository Layout</a><a class="toc-main" href="#core-framework">Core Framework</a><a class="toc-main" href="#enterprise-discovery-engine">Enterprise Discovery Engine</a><a class="toc-main" href="#readme-part-2">README Part 2</a><a class="toc-sub" href="#repository-architecture-enterprise-discovery-platform-connectors">Repository Architecture, Enterprise Discovery &amp; Platform Connectors</a><a class="toc-main" href="#repository-philosophy-2">Repository Philosophy</a><a class="toc-main" href="#complete-repository-structure">Complete Repository Structure</a><a class="toc-main" href="#shared-core-framework">Shared Core Framework</a><a class="toc-main" href="#connector-layer">Connector Layer</a><a class="toc-main" href="#prisma-cloud-connector">Prisma Cloud Connector</a><a class="toc-sub" href="#compute">Compute</a><a class="toc-sub" href="#cspm">CSPM</a><a class="toc-sub" href="#appsec">AppSec</a><a class="toc-main" href="#wiz-connector">Wiz Connector</a><a class="toc-main" href="#enterprise-discovery-engine-2">Enterprise Discovery Engine</a><a class="toc-main" href="#aws-discovery">AWS Discovery</a><a class="toc-sub" href="#organizations">Organizations</a><a class="toc-sub" href="#cloud-services">Cloud Services</a><a class="toc-sub" href="#compute-2">Compute</a><a class="toc-sub" href="#storage">Storage</a><a class="toc-sub" href="#containers">Containers</a><a class="toc-sub" href="#networking">Networking</a><a class="toc-sub" href="#identity">Identity</a><a class="toc-sub" href="#validation">Validation</a><a class="toc-main" href="#azure-discovery">Azure Discovery</a><a class="toc-main" href="#google-cloud-discovery">Google Cloud Discovery</a><a class="toc-main" href="#kubernetes-discovery">Kubernetes Discovery</a><a class="toc-sub" href="#cluster">Cluster</a><a class="toc-sub" href="#nodes">Nodes</a><a class="toc-sub" href="#workloads">Workloads</a><a class="toc-sub" href="#runtime">Runtime</a><a class="toc-sub" href="#security">Security</a><a class="toc-sub" href="#runtime-protection">Runtime Protection</a><a class="toc-main" href="#repository-discovery">Repository Discovery</a><a class="toc-main" href="#registry-discovery">Registry Discovery</a><a class="toc-main" href="#ci-cd-discovery">CI/CD Discovery</a><a class="toc-main" href="#identity-discovery">Identity Discovery</a><a class="toc-main" href="#sqlite-evidence-database">SQLite Evidence Database</a><a class="toc-main" href="#evidence-repository">Evidence Repository</a><a class="toc-main" href="#readme-part-3">README Part 3</a><a class="toc-sub" href="#intelligence-engine-coverage-analysis-migration-planning">Intelligence Engine, Coverage Analysis &amp; Migration Planning</a><a class="toc-main" href="#table-of-contents-2">Table of Contents</a><a class="toc-main" href="#enterprise-intelligence-layer">Enterprise Intelligence Layer</a><a class="toc-main" href="#cross-platform-correlation-engine">Cross Platform Correlation Engine</a><a class="toc-main" href="#enterprise-asset-graph">Enterprise Asset Graph</a><a class="toc-main" href="#coverage-delta-engine">Coverage Delta Engine</a><a class="toc-sub" href="#coverage-categories">Coverage Categories</a><a class="toc-sub" href="#example-report">Example Report</a><a class="toc-sub" href="#cluster-coverage">Cluster Coverage</a><a class="toc-main" href="#runtime-coverage-analysis">Runtime Coverage Analysis</a><a class="toc-main" href="#defender-replacement-engine">Defender Replacement Engine</a><a class="toc-sub" href="#replacement-categories">Replacement Categories</a><a class="toc-sub" href="#example">Example</a><a class="toc-main" href="#runtime-planner">Runtime Planner</a><a class="toc-main" href="#onboarding-validation-engine">Onboarding Validation Engine</a><a class="toc-sub" href="#validation-result">Validation Result</a><a class="toc-main" href="#migration-readiness-engine">Migration Readiness Engine</a><a class="toc-sub" href="#readiness-score">Readiness Score</a><a class="toc-main" href="#policy-translation-engine">Policy Translation Engine</a><a class="toc-sub" href="#translation-status">Translation Status</a><a class="toc-sub" href="#policy-mapping">Policy Mapping</a><a class="toc-main" href="#compatibility-engine">Compatibility Engine</a><a class="toc-main" href="#migration-intelligence-engine">Migration Intelligence Engine</a><a class="toc-main" href="#dry-run-engine">Dry Run Engine</a><a class="toc-main" href="#rollback-planning">Rollback Planning</a><a class="toc-main" href="#engineering-work-queue">Engineering Work Queue</a><a class="toc-main" href="#recommendation-engine">Recommendation Engine</a><a class="toc-main" href="#business-case-generator">Business Case Generator</a><a class="toc-sub" href="#example-2">Example</a><a class="toc-main" href="#executive-migration-scorecard">Executive Migration Scorecard</a><a class="toc-main" href="#continuous-drift-detection">Continuous Drift Detection</a><a class="toc-main" href="#api-health-monitoring">API Health Monitoring</a><a class="toc-main" href="#evidence-preservation">Evidence Preservation</a><a class="toc-main" href="#readme-part-4">README Part 4</a><a class="toc-sub" href="#enterprise-dashboards-apis-deployment-security-roadmap-future-vision">Enterprise Dashboards, APIs, Deployment, Security, Roadmap &amp; Future Vision</a><a class="toc-main" href="#table-of-contents-3">Table of Contents</a><a class="toc-main" href="#executive-dashboard">Executive Dashboard</a><a class="toc-sub" href="#executive-kpis">Executive KPIs</a><a class="toc-sub" href="#executive-home-page">Executive Home Page</a><a class="toc-main" href="#engineering-dashboard">Engineering Dashboard</a><a class="toc-main" href="#runtime-dashboard">Runtime Dashboard</a><a class="toc-main" href="#migration-dashboard">Migration Dashboard</a><a class="toc-main" href="#compliance-dashboard">Compliance Dashboard</a><a class="toc-main" href="#rest-api">REST API</a><a class="toc-main" href="#graphql-api">GraphQL API</a><a class="toc-main" href="#cli">CLI</a><a class="toc-main" href="#plugin-sdk">Plugin SDK</a><a class="toc-main" href="#reporting-framework">Reporting Framework</a><a class="toc-main" href="#sqlite-evidence-schema">SQLite Evidence Schema</a><a class="toc-main" href="#security-model">Security Model</a><a class="toc-main" href="#deployment">Deployment</a><a class="toc-sub" href="#microservice-architecture">Microservice Architecture</a><a class="toc-main" href="#ci-cd-integration">CI/CD Integration</a><a class="toc-main" href="#testing-strategy">Testing Strategy</a><a class="toc-main" href="#multi-tenant-architecture">Multi-Tenant Architecture</a><a class="toc-main" href="#ai-security-discovery">AI Security Discovery</a><a class="toc-main" href="#mcp-discovery">MCP Discovery</a><a class="toc-main" href="#future-platform-modules">Future Platform Modules</a><a class="toc-main" href="#development-roadmap">Development Roadmap</a><a class="toc-sub" href="#version-1">Version 1</a><a class="toc-sub" href="#version-2">Version 2</a><a class="toc-sub" href="#version-3">Version 3</a><a class="toc-sub" href="#version-4">Version 4</a><a class="toc-sub" href="#version-5">Version 5</a><a class="toc-sub" href="#version-6">Version 6</a><a class="toc-sub" href="#version-7">Version 7</a><a class="toc-main" href="#competitive-advantages">Competitive Advantages</a><a class="toc-main" href="#final-vision">Final Vision</a></aside><main><section class="hero"><h1 id="enterprise-cloud-security-discovery-reporting-migration-platform">Enterprise Cloud Security: Discovery, Evidence &amp; Migration Intelligence</h1><p>A decision platform that gives executives one trusted view of cloud coverage, migration readiness, operational risk, and evidence across AWS, Azure, GCP, Kubernetes, Prisma Cloud, Cortex, and Wiz.</p><div class="badges"><span class="badge">Working Demo</span><span class="badge">Prisma Cloud SDK</span><span class="badge">Wiz GraphQL</span><span class="badge">Coverage Delta</span><span class="badge">Defender Replacement</span><span class="badge">Executive Reporting</span><span class="badge">Reviewed Architecture</span><span class="badge">Migration Gates</span><span class="badge">Evidence Trust</span></div></section><div class="exec-toolbar"><div><strong>Executive presentation view</strong><div class="toolbar-label">Full technical detail remains available below.</div></div><div class="exec-actions"><button class="exec-btn" onclick="document.body.classList.toggle('executive-only');this.textContent=document.body.classList.contains('executive-only')?'Show Full Detail':'Executive View'">Executive View</button><button class="exec-btn primary" onclick="window.print()">Print / Save PDF</button></div></div><section class="exec-overview" id="executive-command-view">
+<div class="exec-kicker">Executive command view</div>
+<h2>One platform. One evidence model. One controlled migration path.</h2>
+<p class="exec-lead">The platform converts fragmented cloud-security telemetry into an enterprise asset graph, measurable coverage decisions, migration gates, and board-ready reporting.</p>
+<div class="kpi-grid">
+<div class="kpi blue"><span class="label">Cloud scope</span><span class="num">Multi-cloud</span><p>AWS, Azure, GCP, Kubernetes, registries, pipelines, runtime, and security platforms.</p></div>
+<div class="kpi green"><span class="label">Decision model</span><span class="num">Evidence-led</span><p>Every recommendation traces to source, timestamp, tenant, freshness, confidence, and owner.</p></div>
+<div class="kpi amber"><span class="label">Migration posture</span><span class="num">Gate-based</span><p>No control is retired until equivalent coverage, parallel validation, approval, and rollback are proven.</p></div>
+<div class="kpi purple"><span class="label">Business outcome</span><span class="num">Lower risk</span><p>Reduced blind spots, faster onboarding, measurable engineering work, and defensible reporting.</p></div>
+</div>
+<div class="exec-decision">
+<div class="exec-panel"><h3>Executive decision framework</h3>
+<div class="decision-row"><span>Discovery and normalized evidence foundation</span><span class="decision-status ready">Validated demo</span></div>
+<div class="decision-row"><span>Coverage, correlation, and migration intelligence</span><span class="decision-status planned">Platform roadmap</span></div>
+<div class="decision-row"><span>Runtime replacement by workload type</span><span class="decision-status gated">Approval gated</span></div>
+<div class="decision-row"><span>Enterprise deployment, tenancy, SLOs, and DR</span><span class="decision-status planned">Production hardening</span></div>
+</div>
+<div class="exec-panel"><h3>Readiness principle</h3><div class="exec-ring"><div class="ring"><strong>78%</strong></div><div class="ring-copy"><strong>Illustrative readiness</strong><p>Readiness is calculated from discovery, identity, runtime parity, policy translation, observation, and rollback evidence.</p><p>Production thresholds remain configurable.</p></div></div></div>
+</div>
+<div class="exec-note"><strong>Executive rule:</strong> distinguish implemented, demo-validated, planned, and vendor-confirmation-dependent capabilities in every report and roadmap.</div>
+</section>
+<section class="audit-banner" id="document-review">
+<h1 id="document-review-corrections-missing-capabilities-architecture-decisions">Architecture Assurance &amp; Key Decisions</h1>
+<p>This reviewed edition keeps the original platform vision while separating verified capabilities, planned capabilities, and migration assumptions. It also adds the operational controls required for a production enterprise platform.</p>
+<div class="finding-grid">
+<div class="finding"><strong>Corrected HTML</strong>Unique section IDs, regenerated navigation, valid code classes, removed Markdown artifacts, and eliminated draft-conversation text.</div>
+<div class="finding"><strong>Clarified Migration Language</strong>Prisma Defender retirement is now gated by workload-specific equivalent coverage and evidence; a cloud connector alone must not be treated as runtime replacement.</div>
+<div class="finding"><strong>Added Production Controls</strong>Data provenance, freshness, tenancy isolation, secrets handling, idempotency, reconciliation, approval gates, rollback evidence, and API-contract testing.</div>
+<div class="finding"><strong>Added Reporting Gaps</strong>Confidence scores, unknown coverage, stale evidence, unsupported mappings, collection/scope parity, exceptions, suppressions, ownership, and cost/licensing assumptions.</div>
+</div>
+<div class="callout"><strong>Critical architecture rule:</strong> label every feature as <em>Implemented</em>, <em>Validated in demo</em>, <em>Planned</em>, or <em>Requires vendor/API confirmation</em>. This prevents the roadmap from being mistaken for delivered functionality.</div>
+</section>
+<section class="visual-section" id="additional-decision-graphics-section">
+<h1 id="additional-decision-graphics">Executive Decision Graphics</h1>
+<p>These graphics focus on coverage confidence, migration gates, and evidence trust—the areas most likely to cause an unsafe or incomplete migration.</p>
+<div class="graph-grid">
+<div class="graph-card"><h2 id="coverage-and-replacement-decision-matrix">Coverage and Replacement Decision Matrix</h2>
+<div class="matrix">
+<div class="head">Asset / Control</div><div class="head">Prisma Evidence</div><div class="head">Target Evidence</div><div class="head">Parity</div><div class="head">Action</div>
+<div>Cloud account posture</div><div class="good">Current</div><div class="good">Current</div><div class="good">Equivalent</div><div>Ready for validation</div>
+<div>Kubernetes runtime</div><div class="good">Defender healthy</div><div class="warn">Coverage unverified</div><div class="warn">Unknown</div><div>Parallel validation</div>
+<div>Host runtime</div><div class="good">Protected</div><div class="bad">Missing</div><div class="bad">No parity</div><div>Do not retire Defender</div>
+<div>Policy scope / collections</div><div class="good">Mapped</div><div class="warn">Partial mapping</div><div class="warn">Partial</div><div>Engineering review</div>
+<div>Exceptions / suppressions</div><div class="good">Exported</div><div class="warn">Not imported</div><div class="warn">Incomplete</div><div>Translate and approve</div>
+<div>Evidence freshness</div><div class="warn">2 hours old</div><div class="good">15 minutes old</div><div class="warn">Mixed</div><div>Re-run before cutover</div>
+</div></div>
+<div class="graph-card"><h2 id="migration-gate-scorecard">Migration Gate Scorecard</h2>
+<div class="gate-row"><strong>Discovery completeness</strong><div class="bar"><span style="width:100%"></span></div><span class="status-pill">Required: 100%</span></div>
+<div class="gate-row"><strong>Identity &amp; permissions</strong><div class="bar"><span style="width:95%"></span></div><span class="status-pill">No critical gaps</span></div>
+<div class="gate-row"><strong>Runtime parity</strong><div class="bar"><span style="width:85%"></span></div><span class="status-pill">Per workload</span></div>
+<div class="gate-row"><strong>Policy translation</strong><div class="bar"><span style="width:90%"></span></div><span class="status-pill">Exceptions included</span></div>
+<div class="gate-row"><strong>Parallel observation</strong><div class="bar"><span style="width:100%"></span></div><span class="status-pill">Time-bound window</span></div>
+<div class="gate-row"><strong>Rollback evidence</strong><div class="bar"><span style="width:100%"></span></div><span class="status-pill">Mandatory</span></div>
+<p class="small">Percentages are illustrative. Production gates must be configurable and traceable to evidence, approver, timestamp, tenant, and migration wave.</p></div>
+<div class="graph-card"><svg aria-label="Evidence trust pipeline" role="img" viewbox="0 0 1200 620"><defs><filter height="160%" id="shadow" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Evidence Trust Pipeline</text>
+<rect class="svg-lane" height="118" rx="24" width="1090" x="55" y="85"></rect><text class="svg-label" x="82" y="112">INGEST &amp; PROVENANCE</text>
+<rect class="svg-box-alt" height="58" rx="18" width="205" x="90" y="128"></rect><text class="svg-step" x="108" y="150">01</text><text class="svg-text" text-anchor="middle" x="192.5" y="166">Vendor / Cloud API</text><text class="svg-sub" text-anchor="middle" x="192.5" y="190">raw source evidence</text><line class="svg-line-accent" x1="295" x2="350" y1="157" y2="157"></line><polygon class="svg-arrow" points="340,151 350,157 340,163"></polygon><rect class="svg-box" height="58" rx="18" width="220" x="360" y="128"></rect><text class="svg-step" x="378" y="150">02</text><text class="svg-text" text-anchor="middle" x="470.0" y="166">Provenance Envelope</text><text class="svg-sub" text-anchor="middle" x="470.0" y="190">tenant • time • hash</text><line class="svg-line-accent" x1="580" x2="635" y1="157" y2="157"></line><polygon class="svg-arrow" points="625,151 635,157 625,163"></polygon><rect class="svg-box" height="58" rx="18" width="220" x="645" y="128"></rect><text class="svg-step" x="663" y="150">03</text><text class="svg-text" text-anchor="middle" x="755.0" y="166">Normalize &amp; Validate</text><text class="svg-sub" text-anchor="middle" x="755.0" y="190">schema • quality</text><line class="svg-line-accent" x1="865" x2="920" y1="157" y2="157"></line><polygon class="svg-arrow" points="910,151 920,157 910,163"></polygon><rect class="svg-box-alt" height="58" rx="18" width="180" x="930" y="128"></rect><text class="svg-step" x="948" y="150">04</text><text class="svg-text" text-anchor="middle" x="1020.0" y="166">Immutable Archive</text><text class="svg-sub" text-anchor="middle" x="1020.0" y="190">raw JSON + checksum</text>
+<rect class="svg-lane" height="130" rx="24" width="1090" x="55" y="245"></rect><text class="svg-label" x="82" y="273">CORRELATE &amp; DECIDE</text>
+<rect class="svg-box" height="62" rx="18" width="225" x="120" y="292"></rect><text class="svg-step" x="138" y="314">05</text><text class="svg-text" text-anchor="middle" x="232.5" y="330">Correlation Graph</text><text class="svg-sub" text-anchor="middle" x="232.5" y="354">identity • relationships</text><line class="svg-line-accent" x1="345" x2="425" y1="323" y2="323"></line><polygon class="svg-arrow" points="415,317 425,323 415,329"></polygon><rect class="svg-box-alt" height="62" rx="18" width="230" x="435" y="292"></rect><text class="svg-step" x="453" y="314">06</text><text class="svg-text" text-anchor="middle" x="550.0" y="330">Coverage &amp; Readiness</text><text class="svg-sub" text-anchor="middle" x="550.0" y="354">gaps • confidence • risk</text><line class="svg-line-accent" x1="665" x2="745" y1="323" y2="323"></line><polygon class="svg-arrow" points="735,317 745,323 735,329"></polygon><rect class="svg-box" height="62" rx="18" width="225" x="755" y="292"></rect><text class="svg-step" x="773" y="314">07</text><text class="svg-text" text-anchor="middle" x="867.5" y="330">Recommendation Engine</text><text class="svg-sub" text-anchor="middle" x="867.5" y="354">action • owner • priority</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="375" y2="420"></line><polygon class="svg-arrow" points="594,410 606,410 600,420"></polygon><rect fill="url(#flow)" height="120" opacity=".18" rx="24" stroke="#22d3ee" stroke-width="2" width="700" x="250" y="430"></rect><text class="svg-text" text-anchor="middle" x="600" y="470">Traceable Output</text><text class="svg-sub" text-anchor="middle" x="600" y="500">Every dashboard, migration decision, and report links back to preserved evidence</text><text class="svg-sub" text-anchor="middle" x="600" y="530">with freshness, confidence, ownership, and validation status</text></svg></div>
+</div></section>
+<section class="visual-section" id="missing-production-requirements">
+<h1 id="missing-production-requirements-added-to-the-design">Production Readiness Requirements</h1>
+<div class="finding-grid">
+<div class="finding"><strong>Data contracts</strong>Versioned normalized schemas, connector capability manifests, backward compatibility, nullable/unknown semantics, and vendor-field lineage.</div>
+<div class="finding"><strong>Collection reliability</strong>Pagination, checkpointing, incremental sync, idempotency, retry budgets, rate-limit telemetry, dead-letter queues, and partial-run status.</div>
+<div class="finding"><strong>Evidence integrity</strong>SHA-256 hashes, source timestamps, collection timestamps, tenant IDs, correlation confidence, retention policy, encryption, and tamper-evident manifests.</div>
+<div class="finding"><strong>Migration safety</strong>Wave planning, freeze windows, approval separation, success criteria, parallel observation, blast-radius limits, rollback triggers, and post-cutover monitoring.</div>
+<div class="finding"><strong>Security &amp; tenancy</strong>Least privilege, secret rotation, tenant-scoped encryption keys, row-level isolation, audit trails, data residency, and export controls.</div>
+<div class="finding"><strong>Operations</strong>SLOs, health probes, queue depth, connector lag, freshness objectives, backup/restore, disaster recovery, capacity planning, and runbooks.</div>
+<div class="finding"><strong>Reporting semantics</strong>Denominators, excluded assets, stale/unknown data, confidence intervals, exception ownership, accepted risk, and historical trend snapshots.</div>
+<div class="finding"><strong>Testing</strong>Recorded API fixtures, contract tests, schema-drift tests, synthetic tenants, scale tests, migration simulations, rollback tests, and security tests.</div>
+</div>
+<h2 id="important-terminology-correction">Important Terminology Correction</h2>
+<p>A Prisma Defender is a workload/runtime security agent. A target-platform cloud connector generally establishes cloud inventory or configuration access and must not automatically be treated as an equivalent runtime control. The replacement engine must compare capabilities by workload type—Kubernetes, host, container, serverless, embedded application, and agentless coverage—and only authorize retirement when the target control is deployed, healthy, observed in parallel, and meets defined parity criteria.</p>
+<h2 id="reporting-fields-still-required">Reporting Fields Still Required</h2>
+<pre><code class="language-text">report_run_id
+snapshot_id
+tenant_id
+source_platform
+source_api_version
+source_object_id
+source_timestamp
+collected_at
+normalized_schema_version
+evidence_hash
+freshness_seconds
+correlation_confidence
+coverage_state: protected | partial | unprotected | unknown | stale
+mapping_status: exact | close | partial | unsupported | not_evaluated
+exception_id / exception_expiry
+owner / approver
+migration_wave
+rollback_reference
+licensing_assumption
+cost_assumption</code></pre>
+</section>
+<section class="visual-section" id="official-validation-notes-section"><h1 id="official-validation-notes">Vendor Validation &amp; Evidence Notes</h1>
+<p>Prisma Cloud’s official API documentation confirms that Defenders are security agents, provides endpoints for deployed Defender inventory and summary, and exposes connected/deployed/licensed counts by category. The platform design should consume those fields directly rather than infer health from a single status field.</p>
+<p>Prisma Cloud’s Cloud Security APIs require appropriate roles and short-lived authorization tokens, so the connector framework must support token renewal, permission diagnostics, and clear partial-coverage reporting. Some posture data is snapshot-based and can lag, making evidence freshness an explicit reporting requirement.</p>
+<ul class="source-list"><li>https://pan.dev/prisma-cloud/api/cwpp/get-defenders/</li><li>https://pan.dev/prisma-cloud/api/cwpp/get-defenders-summary/</li><li>https://pan.dev/prisma-cloud/docs/cwpp/deploy-defenders/</li><li>https://pan.dev/prisma-cloud/api/cspm/</li><li>https://pan.dev/prisma-cloud/api/cspm/get-resource-scan-info/</li></ul>
+</section>
+<section class="visual-section" id="visual-architecture"><h1 id="visual-architecture-workflow-graphs">Platform Architecture &amp; Control Flows</h1><p>These diagrams summarize the architecture and workflows described throughout the document.</p><div class="graph-grid"><div class="graph-card"><svg aria-label="Enterprise Platform Architecture" role="img" viewbox="0 0 1200 760"><defs><filter height="160%" id="shadow-2" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow-2" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Enterprise Platform Architecture</text>
+<rect class="svg-lane" height="120" rx="24" width="1110" x="45" y="82"></rect><text class="svg-label" x="72" y="108">SOURCE SYSTEMS</text>
+<rect class="svg-box-alt" height="58" rx="18" width="175" x="80" y="125"></rect><text class="svg-text" text-anchor="middle" x="167.5" y="159">Cloud</text><text class="svg-sub" text-anchor="middle" x="167.5" y="183">AWS • Azure • GCP</text><rect class="svg-box-alt" height="58" rx="18" width="175" x="285" y="125"></rect><text class="svg-text" text-anchor="middle" x="372.5" y="159">Security Platforms</text><text class="svg-sub" text-anchor="middle" x="372.5" y="183">Prisma • Cortex • Wiz</text><rect class="svg-box-alt" height="58" rx="18" width="175" x="490" y="125"></rect><text class="svg-text" text-anchor="middle" x="577.5" y="159">Runtime</text><text class="svg-sub" text-anchor="middle" x="577.5" y="183">Kubernetes • hosts</text><rect class="svg-box-alt" height="58" rx="18" width="175" x="695" y="125"></rect><text class="svg-text" text-anchor="middle" x="782.5" y="159">DevSecOps</text><text class="svg-sub" text-anchor="middle" x="782.5" y="183">SCM • CI/CD • registry</text><rect class="svg-box-alt" height="58" rx="18" width="175" x="900" y="125"></rect><text class="svg-text" text-anchor="middle" x="987.5" y="159">Business Systems</text><text class="svg-sub" text-anchor="middle" x="987.5" y="183">Jira • ServiceNow</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="202" y2="242"></line><polygon class="svg-arrow" points="594,232 606,232 600,242"></polygon><rect class="svg-lane" height="175" rx="24" width="1110" x="45" y="252"></rect><text class="svg-label" x="72" y="280">PLATFORM CORE</text>
+<rect class="svg-box" height="72" rx="18" width="200" x="85" y="310"></rect><text class="svg-step" x="103" y="332">01</text><text class="svg-text" text-anchor="middle" x="185.0" y="348">Discovery</text><text class="svg-sub" text-anchor="middle" x="185.0" y="372">connectors • scheduling</text><line class="svg-line-accent" x1="285" x2="345" y1="346" y2="346"></line><polygon class="svg-arrow" points="335,340 345,346 335,352"></polygon><rect class="svg-box" height="72" rx="18" width="200" x="355" y="310"></rect><text class="svg-step" x="373" y="332">02</text><text class="svg-text" text-anchor="middle" x="455.0" y="348">Normalization</text><text class="svg-sub" text-anchor="middle" x="455.0" y="372">canonical asset model</text><line class="svg-line-accent" x1="555" x2="615" y1="346" y2="346"></line><polygon class="svg-arrow" points="605,340 615,346 605,352"></polygon><rect class="svg-box" height="72" rx="18" width="200" x="625" y="310"></rect><text class="svg-step" x="643" y="332">03</text><text class="svg-text" text-anchor="middle" x="725.0" y="348">Correlation</text><text class="svg-sub" text-anchor="middle" x="725.0" y="372">enterprise asset graph</text><line class="svg-line-accent" x1="825" x2="885" y1="346" y2="346"></line><polygon class="svg-arrow" points="875,340 885,346 875,352"></polygon><rect class="svg-box" height="72" rx="18" width="200" x="895" y="310"></rect><text class="svg-step" x="913" y="332">04</text><text class="svg-text" text-anchor="middle" x="995.0" y="348">Evidence</text><text class="svg-sub" text-anchor="middle" x="995.0" y="372">history • provenance</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="427" y2="472"></line><polygon class="svg-arrow" points="594,462 606,462 600,472"></polygon><rect class="svg-lane" height="125" rx="24" width="1110" x="45" y="482"></rect><text class="svg-label" x="72" y="509">INTELLIGENCE</text>
+<rect class="svg-box-alt" height="58" rx="18" width="190" x="90" y="530"></rect><text class="svg-text" text-anchor="middle" x="185.0" y="564">Coverage Delta</text><text class="svg-sub" text-anchor="middle" x="185.0" y="588">protected • missing</text><rect class="svg-box-alt" height="58" rx="18" width="190" x="310" y="530"></rect><text class="svg-text" text-anchor="middle" x="405.0" y="564">Validation</text><text class="svg-sub" text-anchor="middle" x="405.0" y="588">health • readiness</text><rect class="svg-box-alt" height="58" rx="18" width="190" x="530" y="530"></rect><text class="svg-text" text-anchor="middle" x="625.0" y="564">Migration</text><text class="svg-sub" text-anchor="middle" x="625.0" y="588">plan • dry run • rollback</text><rect class="svg-box-alt" height="58" rx="18" width="190" x="750" y="530"></rect><text class="svg-text" text-anchor="middle" x="845.0" y="564">Policy Mapping</text><text class="svg-sub" text-anchor="middle" x="845.0" y="588">exact • partial • gap</text><rect class="svg-box-alt" height="58" rx="18" width="150" x="970" y="530"></rect><text class="svg-text" text-anchor="middle" x="1045.0" y="564">ROI</text><text class="svg-sub" text-anchor="middle" x="1045.0" y="588">hours • cost</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="607" y2="642"></line><polygon class="svg-arrow" points="594,632 606,632 600,642"></polygon><rect fill="url(#flow)" height="66" opacity=".2" rx="20" stroke="#22d3ee" stroke-width="2" width="840" x="180" y="652"></rect><text class="svg-text" text-anchor="middle" x="600" y="692">Executive • Engineering • Compliance • Migration Reporting</text></svg></div><div class="graph-card"><svg aria-label="Cross-Platform Asset Correlation" role="img" viewbox="0 0 1200 760"><defs><filter height="160%" id="shadow-3" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow-3" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Cross-Platform Asset Correlation</text>
+<circle cx="600" cy="375" fill="url(#flow)" opacity=".18" r="112" stroke="#22d3ee" stroke-width="3"></circle><text class="svg-text" text-anchor="middle" x="600" y="360">Normalized</text><text class="svg-text" text-anchor="middle" x="600" y="386">Enterprise Asset</text><text class="svg-sub" text-anchor="middle" x="600" y="414">stable identity + relationships</text>
+<rect class="svg-box-alt" height="70" rx="18" width="220" x="70" y="110"></rect><text class="svg-text" text-anchor="middle" x="180.0" y="144">Cloud Account</text><text class="svg-sub" text-anchor="middle" x="180.0" y="168">org • project • region</text><rect class="svg-box-alt" height="70" rx="18" width="220" x="490" y="88"></rect><text class="svg-text" text-anchor="middle" x="600.0" y="122">Runtime</text><text class="svg-sub" text-anchor="middle" x="600.0" y="146">cluster • workload • pod</text><rect class="svg-box-alt" height="70" rx="18" width="220" x="910" y="110"></rect><text class="svg-text" text-anchor="middle" x="1020.0" y="144">Image &amp; Registry</text><text class="svg-sub" text-anchor="middle" x="1020.0" y="168">digest • tag • SBOM</text>
+<rect class="svg-box" height="70" rx="18" width="235" x="40" y="540"></rect><text class="svg-text" text-anchor="middle" x="157.5" y="574">Source &amp; Pipeline</text><text class="svg-sub" text-anchor="middle" x="157.5" y="598">repo • commit • build</text><rect class="svg-box" height="70" rx="18" width="236" x="482" y="585"></rect><text class="svg-text" text-anchor="middle" x="600.0" y="619">Risk &amp; Control</text><text class="svg-sub" text-anchor="middle" x="600.0" y="643">CVE • alert • policy</text><rect class="svg-box" height="70" rx="18" width="235" x="925" y="540"></rect><text class="svg-text" text-anchor="middle" x="1042.5" y="574">Ownership &amp; Workflow</text><text class="svg-sub" text-anchor="middle" x="1042.5" y="598">team • BU • ticket</text>
+<line class="svg-line-accent" x1="290" x2="520" y1="180" y2="310"></line><line class="svg-line-accent" x1="600" x2="600" y1="158" y2="263"></line><line class="svg-line-accent" x1="910" x2="680" y1="180" y2="310"></line><line class="svg-line-accent" x1="275" x2="515" y1="540" y2="440"></line><line class="svg-line-accent" x1="600" x2="600" y1="585" y2="487"></line><line class="svg-line-accent" x1="925" x2="685" y1="540" y2="440"></line>
+<rect class="svg-box-soft" height="42" rx="16" width="700" x="250" y="690"></rect><text class="svg-sub" text-anchor="middle" x="600" y="716">One searchable graph answers lineage, exposure, coverage, ownership, and migration questions</text></svg></div><div class="graph-card"><svg aria-label="Defender-to-Wiz Migration Flow" role="img" viewbox="0 0 1200 720"><defs><filter height="160%" id="shadow-4" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow-4" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Prisma Defender → Target Runtime Decision Flow</text>
+<rect class="svg-box" height="72" rx="18" width="205" x="70" y="110"></rect><text class="svg-step" x="88" y="132">01</text><text class="svg-text" text-anchor="middle" x="172.5" y="148">Discover Defender</text><text class="svg-sub" text-anchor="middle" x="172.5" y="172">type • version • heartbeat</text><line class="svg-line-accent" x1="275" x2="330" y1="146" y2="146"></line><polygon class="svg-arrow" points="320,140 330,146 320,152"></polygon><rect class="svg-box" height="72" rx="18" width="220" x="340" y="110"></rect><text class="svg-step" x="358" y="132">02</text><text class="svg-text" text-anchor="middle" x="450.0" y="148">Map Runtime Controls</text><text class="svg-sub" text-anchor="middle" x="450.0" y="172">collections • policies • scope</text><line class="svg-line-accent" x1="560" x2="615" y1="146" y2="146"></line><polygon class="svg-arrow" points="605,140 615,146 605,152"></polygon><rect class="svg-box-alt" height="72" rx="18" width="220" x="625" y="110"></rect><text class="svg-step" x="643" y="132">03</text><text class="svg-text" text-anchor="middle" x="735.0" y="148">Select Wiz Pattern</text><text class="svg-sub" text-anchor="middle" x="735.0" y="172">connector • sensor • runtime</text><line class="svg-line-accent" x1="845" x2="900" y1="146" y2="146"></line><polygon class="svg-arrow" points="890,140 900,146 890,152"></polygon><rect class="svg-box-alt" height="72" rx="18" width="220" x="910" y="110"></rect><text class="svg-step" x="928" y="132">04</text><text class="svg-text" text-anchor="middle" x="1020.0" y="148">Deploy in Parallel</text><text class="svg-sub" text-anchor="middle" x="1020.0" y="172">no immediate removal</text>
+<line class="svg-line-accent" x1="1020" x2="1020" y1="182" y2="250"></line><polygon class="svg-arrow" points="1014,240 1026,240 1020,250"></polygon><polygon fill="#17213d" filter="url(#shadow)" points="1020,260 1125,330 1020,400 915,330" stroke="#22d3ee" stroke-width="3"></polygon><text class="svg-text" text-anchor="middle" x="1020" y="320">Equivalent</text><text class="svg-text" text-anchor="middle" x="1020" y="345">Coverage?</text>
+<line class="svg-line-accent" x1="915" x2="715" y1="330" y2="330"></line><polygon class="svg-arrow" points="725,324 715,330 725,336"></polygon><text class="svg-step" text-anchor="middle" x="815" y="315">NO</text><rect class="svg-box-soft" height="76" rx="18" width="250" x="455" y="292"></rect><text class="svg-step" x="473" y="314">05A</text><text class="svg-text" text-anchor="middle" x="580.0" y="330">Keep Defender / Remediate</text><text class="svg-sub" text-anchor="middle" x="580.0" y="354">unsupported feature or failed validation</text>
+<line class="svg-line-accent" x1="1020" x2="1020" y1="400" y2="455"></line><polygon class="svg-arrow" points="1014,445 1026,445 1020,455"></polygon><text class="svg-step" x="1048" y="438">YES</text><rect class="svg-box" height="72" rx="18" width="240" x="900" y="465"></rect><text class="svg-step" x="918" y="487">05B</text><text class="svg-text" text-anchor="middle" x="1020.0" y="503">Production Validation</text><text class="svg-sub" text-anchor="middle" x="1020.0" y="527">coverage • alerting • stability</text>
+<line class="svg-line-accent" x1="900" x2="735" y1="501" y2="501"></line><polygon class="svg-arrow" points="745,495 735,501 745,507"></polygon><rect class="svg-box-alt" height="72" rx="18" width="250" x="475" y="465"></rect><text class="svg-step" x="493" y="487">06</text><text class="svg-text" text-anchor="middle" x="600.0" y="503">Approved Cutover</text><text class="svg-sub" text-anchor="middle" x="600.0" y="527">change record • rollback ready</text>
+<line class="svg-line-accent" x1="475" x2="310" y1="501" y2="501"></line><polygon class="svg-arrow" points="320,495 310,501 320,507"></polygon><rect class="svg-box" height="72" rx="18" width="230" x="70" y="465"></rect><text class="svg-step" x="88" y="487">07</text><text class="svg-text" text-anchor="middle" x="185.0" y="503">Remove Defender</text><text class="svg-sub" text-anchor="middle" x="185.0" y="527">only after acceptance gates</text>
+<line class="svg-line-accent" x1="185" x2="185" y1="537" y2="590"></line><polygon class="svg-arrow" points="179,580 191,580 185,590"></polygon><rect class="svg-lane" height="64" rx="20" width="1060" x="70" y="600"></rect><text class="svg-text" text-anchor="middle" x="600" y="627">Post-Migration Drift Monitoring</text><text class="svg-sub" text-anchor="middle" x="600" y="650">connector health • runtime gaps • new clusters • policy drift • rollback triggers</text></svg></div><div class="graph-card"><svg aria-label="Migration Lifecycle" role="img" viewbox="0 0 1200 760"><defs><filter height="160%" id="shadow-5" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow-5" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Controlled Migration Lifecycle</text>
+<rect class="svg-lane" height="118" rx="24" width="1090" x="55" y="88"></rect><text class="svg-label" x="80" y="115">ASSESS</text><rect class="svg-box-alt" height="58" rx="18" width="180" x="95" y="130"></rect><text class="svg-step" x="113" y="152">01</text><text class="svg-text" text-anchor="middle" x="185.0" y="168">Discover</text><text class="svg-sub" text-anchor="middle" x="185.0" y="192">inventory + evidence</text><line class="svg-line-accent" x1="275" x2="330" y1="159" y2="159"></line><polygon class="svg-arrow" points="320,153 330,159 320,165"></polygon><rect class="svg-box" height="58" rx="18" width="180" x="340" y="130"></rect><text class="svg-step" x="358" y="152">02</text><text class="svg-text" text-anchor="middle" x="430.0" y="168">Normalize</text><text class="svg-sub" text-anchor="middle" x="430.0" y="192">canonical model</text><line class="svg-line-accent" x1="520" x2="575" y1="159" y2="159"></line><polygon class="svg-arrow" points="565,153 575,159 565,165"></polygon><rect class="svg-box" height="58" rx="18" width="180" x="585" y="130"></rect><text class="svg-step" x="603" y="152">03</text><text class="svg-text" text-anchor="middle" x="675.0" y="168">Correlate</text><text class="svg-sub" text-anchor="middle" x="675.0" y="192">asset graph</text><line class="svg-line-accent" x1="765" x2="820" y1="159" y2="159"></line><polygon class="svg-arrow" points="810,153 820,159 810,165"></polygon><rect class="svg-box-alt" height="58" rx="18" width="265" x="830" y="130"></rect><text class="svg-step" x="848" y="152">04</text><text class="svg-text" text-anchor="middle" x="962.5" y="168">Compatibility &amp; Gap Analysis</text><text class="svg-sub" text-anchor="middle" x="962.5" y="192">coverage + unsupported features</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="206" y2="247"></line><polygon class="svg-arrow" points="594,237 606,237 600,247"></polygon><rect class="svg-lane" height="118" rx="24" width="1090" x="55" y="257"></rect><text class="svg-label" x="80" y="284">PLAN</text><rect class="svg-box" height="58" rx="18" width="220" x="120" y="298"></rect><text class="svg-step" x="138" y="320">05</text><text class="svg-text" text-anchor="middle" x="230.0" y="336">Engineering Plan</text><text class="svg-sub" text-anchor="middle" x="230.0" y="360">waves • owners • effort</text><line class="svg-line-accent" x1="340" x2="410" y1="327" y2="327"></line><polygon class="svg-arrow" points="400,321 410,327 400,333"></polygon><rect class="svg-box-alt" height="58" rx="18" width="220" x="420" y="298"></rect><text class="svg-step" x="438" y="320">06</text><text class="svg-text" text-anchor="middle" x="530.0" y="336">Dry Run</text><text class="svg-sub" text-anchor="middle" x="530.0" y="360">no production change</text><line class="svg-line-accent" x1="640" x2="710" y1="327" y2="327"></line><polygon class="svg-arrow" points="700,321 710,327 700,333"></polygon><rect class="svg-box" height="58" rx="18" width="220" x="720" y="298"></rect><text class="svg-step" x="738" y="320">07</text><text class="svg-text" text-anchor="middle" x="830.0" y="336">Approval Gate</text><text class="svg-sub" text-anchor="middle" x="830.0" y="360">risk • evidence • rollback</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="375" y2="416"></line><polygon class="svg-arrow" points="594,406 606,406 600,416"></polygon><rect class="svg-lane" height="118" rx="24" width="1090" x="55" y="426"></rect><text class="svg-label" x="80" y="453">EXECUTE</text><rect class="svg-box-alt" height="58" rx="18" width="210" x="120" y="467"></rect><text class="svg-step" x="138" y="489">08</text><text class="svg-text" text-anchor="middle" x="225.0" y="505">Pilot Wave</text><text class="svg-sub" text-anchor="middle" x="225.0" y="529">limited blast radius</text><line class="svg-line-accent" x1="330" x2="390" y1="496" y2="496"></line><polygon class="svg-arrow" points="380,490 390,496 380,502"></polygon><rect class="svg-box" height="58" rx="18" width="210" x="400" y="467"></rect><text class="svg-step" x="418" y="489">09</text><text class="svg-text" text-anchor="middle" x="505.0" y="505">Parallel Validation</text><text class="svg-sub" text-anchor="middle" x="505.0" y="529">old + new coverage</text><line class="svg-line-accent" x1="610" x2="670" y1="496" y2="496"></line><polygon class="svg-arrow" points="660,490 670,496 660,502"></polygon><rect class="svg-box-alt" height="58" rx="18" width="210" x="680" y="467"></rect><text class="svg-step" x="698" y="489">10</text><text class="svg-text" text-anchor="middle" x="785.0" y="505">Cutover</text><text class="svg-sub" text-anchor="middle" x="785.0" y="529">acceptance criteria met</text><line class="svg-line-accent" x1="890" x2="950" y1="496" y2="496"></line><polygon class="svg-arrow" points="940,490 950,496 940,502"></polygon><rect class="svg-box" height="58" rx="18" width="150" x="960" y="467"></rect><text class="svg-step" x="978" y="489">11</text><text class="svg-text" text-anchor="middle" x="1035.0" y="505">Scale Out</text><text class="svg-sub" text-anchor="middle" x="1035.0" y="529">remaining waves</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="544" y2="585"></line><polygon class="svg-arrow" points="594,575 606,575 600,585"></polygon><rect fill="url(#flow)" height="105" opacity=".17" rx="24" stroke="#22d3ee" stroke-width="2" width="930" x="135" y="595"></rect><text class="svg-text" text-anchor="middle" x="600" y="630">Validate Continuously</text><text class="svg-sub" text-anchor="middle" x="600" y="656">SLOs • security parity • evidence • rollback readiness • executive reporting</text><text class="svg-sub" text-anchor="middle" x="600" y="681">Rollback is a controlled branch at every wave—not a final afterthought</text></svg></div><div class="graph-card"><svg aria-label="Deployment Architecture" role="img" viewbox="0 0 1200 760"><defs><filter height="160%" id="shadow-6" width="140%" x="-20%" y="-20%"><fedropshadow dx="0" dy="8" flood-color="#000" flood-opacity=".28" stddeviation="8"></fedropshadow></filter><lineargradient id="flow-6" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"></stop><stop offset="1" stop-color="#22d3ee"></stop></lineargradient></defs><text class="svg-title" text-anchor="middle" x="600" y="42">Deployment Architecture</text>
+<rect class="svg-lane" height="82" rx="22" width="1060" x="70" y="85"></rect><text class="svg-text" text-anchor="middle" x="600" y="118">Users &amp; Automation</text><text class="svg-sub" text-anchor="middle" x="600" y="143">Web UI • CLI • REST • GraphQL • Scheduler • CI/CD</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="167" y2="208"></line><polygon class="svg-arrow" points="594,198 606,198 600,208"></polygon><rect class="svg-box-alt" height="68" rx="18" width="320" x="440" y="218"></rect><text class="svg-text" text-anchor="middle" x="600.0" y="252">API Gateway &amp; Identity</text><text class="svg-sub" text-anchor="middle" x="600.0" y="276">authentication • RBAC • tenant context</text>
+<line class="svg-line-accent" x1="440" x2="205" y1="252" y2="252"></line><line class="svg-line-accent" x1="760" x2="995" y1="252" y2="252"></line>
+<rect class="svg-box" height="76" rx="18" width="210" x="70" y="300"></rect><text class="svg-step" x="88" y="322">01</text><text class="svg-text" text-anchor="middle" x="175.0" y="338">Discovery Service</text><text class="svg-sub" text-anchor="middle" x="175.0" y="362">connectors • checkpoints</text><rect class="svg-box" height="76" rx="18" width="210" x="355" y="300"></rect><text class="svg-step" x="373" y="322">02</text><text class="svg-text" text-anchor="middle" x="460.0" y="338">Correlation Service</text><text class="svg-sub" text-anchor="middle" x="460.0" y="362">identity • graph</text><rect class="svg-box" height="76" rx="18" width="210" x="635" y="300"></rect><text class="svg-step" x="653" y="322">03</text><text class="svg-text" text-anchor="middle" x="740.0" y="338">Analysis Service</text><text class="svg-sub" text-anchor="middle" x="740.0" y="362">coverage • readiness</text><rect class="svg-box" height="76" rx="18" width="210" x="920" y="300"></rect><text class="svg-step" x="938" y="322">04</text><text class="svg-text" text-anchor="middle" x="1025.0" y="338">Reporting Service</text><text class="svg-sub" text-anchor="middle" x="1025.0" y="362">dashboards • exports</text>
+<line class="svg-line-accent" x1="280" x2="355" y1="338" y2="338"></line><line class="svg-line-accent" x1="565" x2="635" y1="338" y2="338"></line><line class="svg-line-accent" x1="845" x2="920" y1="338" y2="338"></line>
+<line class="svg-line-accent" x1="600" x2="600" y1="376" y2="430"></line><polygon class="svg-arrow" points="594,420 606,420 600,430"></polygon><rect class="svg-lane" height="105" rx="24" width="1060" x="70" y="440"></rect><text class="svg-label" x="95" y="468">SHARED PLATFORM SERVICES</text><rect class="svg-box-soft" height="46" rx="18" width="185" x="105" y="482"></rect><text class="svg-text" text-anchor="middle" x="197.5" y="516">Queue / Scheduler</text><rect class="svg-box-soft" height="46" rx="18" width="185" x="320" y="482"></rect><text class="svg-text" text-anchor="middle" x="412.5" y="516">Secrets / KMS</text><rect class="svg-box-soft" height="46" rx="18" width="185" x="535" y="482"></rect><text class="svg-text" text-anchor="middle" x="627.5" y="516">Metrics / Logs</text><rect class="svg-box-soft" height="46" rx="18" width="185" x="750" y="482"></rect><text class="svg-text" text-anchor="middle" x="842.5" y="516">Policy / Config</text><rect class="svg-box-soft" height="46" rx="18" width="130" x="965" y="482"></rect><text class="svg-text" text-anchor="middle" x="1030.0" y="516">Cache</text>
+<line class="svg-line-accent" x1="600" x2="600" y1="545" y2="585"></line><polygon class="svg-arrow" points="594,575 606,575 600,585"></polygon><rect fill="url(#flow)" height="112" opacity=".16" rx="24" stroke="#22d3ee" stroke-width="2" width="1000" x="100" y="595"></rect><text class="svg-text" text-anchor="middle" x="600" y="630">Data &amp; Evidence Layer</text><text class="svg-sub" text-anchor="middle" x="600" y="658">PostgreSQL / SQLite • object storage • raw API archive • graph projection • report history</text><text class="svg-sub" text-anchor="middle" x="600" y="684">encrypted • tenant-isolated • versioned • auditable • backup and restore tested</text></svg></div></div></section><article>
+<section class="visual-section" id="integrated-cloud-discovery-engine">
+<h1>Integrated Enterprise Cloud Discovery Engine</h1>
+<p>The platform now includes a dedicated, read-only multi-cloud discovery worker named <strong>Enterprise Cloud Discovery Engine</strong>. This component is integrated as the provider-native collection layer and is intentionally separated from vendor security connectors and migration execution.</p>
+<div class="graph-card">
+<svg aria-label="Integrated Cloud Discovery Engine architecture" role="img" viewbox="0 0 1440 700">
+<text class="svg-title" text-anchor="middle" x="720" y="38">Integrated Cloud Discovery Engine — Platform Data Flow</text>
+<defs><marker id="ecd-arrow" markerheight="10" markerwidth="10" orient="auto" refx="8" refy="3"><path class="svg-arrow" d="M0,0 L0,6 L9,3 z"></path></marker></defs>
+<text class="svg-text" text-anchor="middle" x="135" y="92">Provider Sources</text>
+<rect class="svg-box" height="62" rx="14" width="200" x="35" y="115"></rect><text class="svg-text" text-anchor="middle" x="135" y="152">AWS / Azure / GCP</text>
+<rect class="svg-box" height="62" rx="14" width="200" x="35" y="200"></rect><text class="svg-text" text-anchor="middle" x="135" y="237">Kubernetes / OCI</text>
+<rect class="svg-box" height="62" rx="14" width="200" x="35" y="285"></rect><text class="svg-text" text-anchor="middle" x="135" y="322">DigitalOcean / Alibaba</text>
+<text class="svg-text" text-anchor="middle" x="440" y="92">Discovery Worker</text>
+<rect class="svg-box" height="232" rx="18" width="250" x="315" y="115"></rect>
+<text class="svg-text" text-anchor="middle" x="440" y="154">Authenticate</text><text class="svg-text" text-anchor="middle" x="440" y="193">Enumerate</text><text class="svg-text" text-anchor="middle" x="440" y="232">Collect</text><text class="svg-text" text-anchor="middle" x="440" y="271">Checkpoint</text><text class="svg-text" text-anchor="middle" x="440" y="310">Snapshot</text>
+<text class="svg-text" text-anchor="middle" x="745" y="92">Evidence Boundary</text>
+<rect class="svg-box" height="62" rx="14" width="220" x="635" y="115"></rect><text class="svg-text" text-anchor="middle" x="745" y="152">Native Snapshot</text>
+<rect class="svg-box" height="62" rx="14" width="220" x="635" y="200"></rect><text class="svg-text" text-anchor="middle" x="745" y="237">Normalized JSONL</text>
+<rect class="svg-box" height="62" rx="14" width="220" x="635" y="285"></rect><text class="svg-text" text-anchor="middle" x="745" y="322">Checksum Manifest</text>
+<text class="svg-text" text-anchor="middle" x="1060" y="92">Platform Core</text>
+<rect class="svg-box" height="62" rx="14" width="260" x="930" y="115"></rect><text class="svg-text" text-anchor="middle" x="1060" y="152">Evidence Repository</text>
+<rect class="svg-box" height="62" rx="14" width="260" x="930" y="200"></rect><text class="svg-text" text-anchor="middle" x="1060" y="237">Normalization &amp; Correlation</text>
+<rect class="svg-box" height="62" rx="14" width="260" x="930" y="285"></rect><text class="svg-text" text-anchor="middle" x="1060" y="322">Coverage &amp; Validation</text>
+<text class="svg-text" text-anchor="middle" x="1320" y="92">Outcomes</text>
+<rect class="svg-box" height="62" rx="14" width="180" x="1230" y="115"></rect><text class="svg-text" text-anchor="middle" x="1320" y="152">Asset Graph</text>
+<rect class="svg-box" height="62" rx="14" width="180" x="1230" y="200"></rect><text class="svg-text" text-anchor="middle" x="1320" y="237">Migration Gates</text>
+<rect class="svg-box" height="62" rx="14" width="180" x="1230" y="285"></rect><text class="svg-text" text-anchor="middle" x="1320" y="322">Reports</text>
+<line class="svg-line" marker-end="url(#ecd-arrow)" x1="235" x2="305" y1="231" y2="231"></line>
+<line class="svg-line" marker-end="url(#ecd-arrow)" x1="565" x2="625" y1="231" y2="231"></line>
+<line class="svg-line" marker-end="url(#ecd-arrow)" x1="855" x2="920" y1="231" y2="231"></line>
+<line class="svg-line" marker-end="url(#ecd-arrow)" x1="1190" x2="1220" y1="231" y2="231"></line>
+<rect class="svg-box" height="190" rx="18" width="1270" x="85" y="425"></rect>
+<text class="svg-title" text-anchor="middle" x="720" y="466">Control Boundary</text>
+<text class="svg-text" text-anchor="middle" x="220" y="515">Discovery Credentials</text><text class="svg-text" text-anchor="middle" x="220" y="548">Read Only</text><text class="svg-text" text-anchor="middle" x="220" y="581">No Migration Rights</text>
+<text class="svg-text" text-anchor="middle" x="520" y="515">Worker Runtime</text><text class="svg-text" text-anchor="middle" x="520" y="548">No Inbound Port</text><text class="svg-text" text-anchor="middle" x="520" y="581">Ephemeral Storage</text>
+<text class="svg-text" text-anchor="middle" x="830" y="515">Evidence Integrity</text><text class="svg-text" text-anchor="middle" x="830" y="548">Timestamp + SHA-256</text><text class="svg-text" text-anchor="middle" x="830" y="581">Partial-State Flags</text>
+<text class="svg-text" text-anchor="middle" x="1135" y="515">Platform Governance</text><text class="svg-text" text-anchor="middle" x="1135" y="548">Tenant Isolation</text><text class="svg-text" text-anchor="middle" x="1135" y="581">Retention + Audit</text>
+</svg>
+</div>
+<h2>Exact Repository Placement</h2>
+<pre><code class="language-text">enterprise-cloud-security-platform/
+  src/
+    discovery/
+      cloud_engine/
+        EnterpriseCloudDiscovery/
+        tests/
+        setup.py
+        requirements.txt
+    connectors/
+      prisma/
+      cortex/
+      wiz/
+    normalize/
+    correlate/
+    validation/
+    reporting/
+    evidence/</code></pre>
+<h2>New Names</h2>
+<ul>
+<li><strong>Component:</strong> Enterprise Cloud Discovery Engine</li>
+<li><strong>Python package:</strong> <code>EnterpriseCloudDiscovery</code></li>
+<li><strong>Distribution:</strong> <code>enterprise-cloud-discovery-engine</code></li>
+<li><strong>CLI:</strong> <code>enterprise-cloud-discovery</code></li>
+<li><strong>Platform command:</strong> <code>enterprise-cloud discover</code></li>
+<li><strong>Evidence source key:</strong> <code>enterprise-cloud-discovery-engine</code></li>
+</ul>
+<h2>Supported Provider Discovery</h2>
+<ul><li>AWS</li><li>Microsoft Azure</li><li>Google Cloud</li><li>Kubernetes</li><li>Oracle Cloud Infrastructure</li><li>DigitalOcean</li><li>Alibaba Cloud</li></ul>
+<h2>Strict Responsibility Boundary</h2>
+<h3>Discovery Engine Owns</h3>
+<ul><li>Provider authentication and API enumeration</li><li>Account, subscription, project, region and cluster discovery</li><li>Native inventory and configuration collection</li><li>Read-only checks</li><li>Native snapshots, source timestamps and checksums</li><li>Collection-gap and permission-denied evidence</li></ul>
+<h3>Platform Core Owns</h3>
+<ul><li>Tenant isolation and scheduling</li><li>Central secret retrieval and short-lived credentials</li><li>Canonical asset normalization</li><li>Correlation with Prisma, Cortex, Wiz, repositories, registries, CI/CD and ownership data</li><li>Coverage delta, onboarding validation and migration readiness</li><li>Dashboards, exports, evidence retention and governance</li></ul>
+<h2>Discovery Job Contract</h2>
+<pre><code class="language-json">{
+  "job_id": "disc-20260712-0001",
+  "tenant_id": "tenant-001",
+  "provider": "aws",
+  "credential_ref": "vault://tenants/tenant-001/aws/audit-role",
+  "scope": {
+    "accounts": ["123456789012"],
+    "regions": ["us-east-1"]
+  },
+  "services": ["iam", "ec2", "s3", "eks", "cloudtrail", "config"],
+  "mode": "full",
+  "output_uri": "object://evidence/tenant-001/disc-20260712-0001/"
+}</code></pre>
+<h2>Normalized Evidence Contract</h2>
+<pre><code class="language-json">{
+  "schema_version": "1.0",
+  "tenant_id": "tenant-001",
+  "source": "enterprise-cloud-discovery-engine",
+  "provider": "aws",
+  "resource_type": "ec2_instance",
+  "source_id": "i-0123456789abcdef0",
+  "account_id": "123456789012",
+  "region": "us-east-1",
+  "observed_at": "2026-07-12T14:00:00+00:00",
+  "payload_sha256": "...",
+  "payload": {}
+}</code></pre>
+<h2>Failure Semantics</h2>
+<ul><li><strong>Authentication failure:</strong> fail the job and calculate no coverage conclusion.</li><li><strong>Single-service failure:</strong> retain successful results and mark the snapshot partial.</li><li><strong>Permission denied:</strong> emit a collection gap, never a false pass.</li><li><strong>Rate limiting:</strong> checkpoint and retry with bounded exponential backoff and jitter.</li><li><strong>Empty result:</strong> distinguish confirmed-empty from not-collected.</li><li><strong>Stale snapshot:</strong> exclude it from migration approval calculations.</li></ul>
+<h2>Required Production Refactoring</h2>
+<ul><li>Replace direct report filesystem dependencies with an <code>EvidenceSink</code> interface.</li><li>Move authentication behind a platform <code>CredentialProvider</code>.</li><li>Add tenant ID, job ID and correlation ID to every log and metric.</li><li>Add per-provider/account/region/service incremental checkpoints.</li><li>Add bounded concurrency, rate-limit budgets and dead-letter processing.</li><li>Add PostgreSQL and encrypted object-storage sinks for production scale.</li><li>Add canonical adapters under <code>normalize/providers/</code>.</li><li>Add API fixture contract tests, schema-drift tests and partial-failure tests.</li><li>Create signed releases and an SBOM for every worker image.</li></ul>
+<h2>Migration Integration Rule</h2>
+<p>Discovery output is evidence, not authorization to migrate. The migration service may only create a cutover plan when the snapshot is complete enough for the selected scope, freshness objectives are satisfied, vendor coverage is correlated, unknown assets are below the approved threshold, and rollback evidence has been generated.</p>
+</section>
+<h1 id="readme-part-1">README Part 1</h1>
+<h2 id="enterprise-cloud-security-discovery-reporting-migration-platform-2">Enterprise Cloud Security Discovery, Reporting &amp; Migration Platform</h2>
+<hr/>
+<h1 id="table-of-contents">Table of Contents</h1>
+<pre><code class="language-text">1. Executive Summary
+2. Product Vision
+3. Why This Framework Matters
+4. Business Justification
+5. Product Goals
+6. Enterprise Architecture
+7. High Level Components
+8. Working Demo
+9. Existing Modules
+10. Repository Layout
+11. Core Framework
+12. Enterprise Discovery Engine</code></pre>
+<hr/>
+<h1 id="enterprise-cloud-security-discovery-reporting-migration-platform-3">Enterprise Cloud Security Discovery, Reporting &amp; Migration Platform</h1>
+<h2 id="working-demo-enterprise-product">Working Demo → Enterprise Product</h2>
+<hr/>
+<h1 id="executive-summary">Executive Summary</h1>
+<p>Organizations today invest significant engineering effort deploying cloud security platforms such as <strong>Prisma Cloud</strong>, <strong>Cortex Cloud</strong>, and <strong>Wiz</strong>. While these products provide excellent security capabilities, enterprise customers continue to face several operational challenges:</p>
+<ul>
+<li>Cloud onboarding is largely manual.</li>
+<li>Runtime validation requires custom scripts.</li>
+<li>Executive reporting is fragmented.</li>
+<li>Asset inventories differ between products.</li>
+<li>Migration between vendors is expensive.</li>
+<li>Engineering teams spend weeks validating deployments.</li>
+<li>Security teams rely on spreadsheets for migration planning.</li>
+</ul>
+<p>The purpose of this project is <strong>not</strong> to replace Wiz or Prisma Cloud.</p>
+<p>Instead, it introduces a <strong>vendor-neutral Enterprise Discovery, Reporting, Validation, and Migration Platform</strong> that sits above both products and automates the operational work surrounding cloud security deployments.</p>
+<p>The platform leverages APIs, SDKs, and cloud-native services to discover enterprise assets, validate onboarding, normalize security data, correlate assets across platforms, produce executive dashboards, and automate migration planning.</p>
+<hr/>
+<h1 id="product-vision">Product Vision</h1>
+<p>The framework is designed around six core principles:</p>
+<h2 id="1-vendor-neutral">1. Vendor Neutral</h2>
+<p>Support multiple platforms without locking customers into one product.</p>
+<p>Supported platforms include:</p>
+<ul>
+<li>Prisma Cloud</li>
+<li>Cortex Cloud</li>
+<li>Wiz</li>
+<li>AWS</li>
+<li>Azure</li>
+<li>Google Cloud</li>
+<li>GitHub</li>
+<li>GitLab</li>
+<li>Azure DevOps</li>
+<li>Bitbucket</li>
+<li>Artifactory</li>
+<li>JFrog Xray</li>
+<li>Jenkins</li>
+<li>Harness</li>
+<li>ServiceNow</li>
+<li>Jira</li>
+</ul>
+<hr/>
+<h2 id="2-discovery-first">2. Discovery First</h2>
+<p>Everything begins with discovery.</p>
+<p>Before onboarding or migration, the platform automatically inventories:</p>
+<ul>
+<li>Cloud accounts</li>
+<li>Kubernetes clusters</li>
+<li>Hosts</li>
+<li>Containers</li>
+<li>Images</li>
+<li>Registries</li>
+<li>Repositories</li>
+<li>Pipelines</li>
+<li>Runtime protection</li>
+<li>IAM permissions</li>
+<li>Cloud services</li>
+<li>Security controls</li>
+</ul>
+<p>Discovery is read-only and does not modify customer environments.</p>
+<hr/>
+<h2 id="3-normalize-everything">3. Normalize Everything</h2>
+<p>Each platform exposes different APIs and data models.</p>
+<p>The framework converts them into a single normalized inventory.</p>
+<p>Example:</p>
+<pre><code class="language-text">AWS Account
+↓
+
+Cluster
+
+↓
+
+Namespace
+
+↓
+
+Deployment
+
+↓
+
+Pod
+
+↓
+
+Container
+
+↓
+
+Image
+
+↓
+
+Registry
+
+↓
+
+Repository
+
+↓
+
+Pipeline
+
+↓
+
+Owner
+
+↓
+
+Business Unit</code></pre>
+<p>This unified model allows the platform to correlate information regardless of the original security product.</p>
+<hr/>
+<h2 id="4-correlate-enterprise-assets">4. Correlate Enterprise Assets</h2>
+<p>After normalization, assets are correlated across multiple systems.</p>
+<p>Example relationships include:</p>
+<pre><code class="language-text">AWS Account
+
+↓
+
+EKS Cluster
+
+↓
+
+Namespace
+
+↓
+
+Deployment
+
+↓
+
+Pod
+
+↓
+
+Container
+
+↓
+
+Image Digest
+
+↓
+
+Registry
+
+↓
+
+Git Commit
+
+↓
+
+Repository
+
+↓
+
+Pipeline
+
+↓
+
+SBOM
+
+↓
+
+Runtime Alert
+
+↓
+
+Owner
+
+↓
+
+Business Unit
+
+↓
+
+Jira Ticket
+
+↓
+
+ServiceNow Incident</code></pre>
+<p>This creates a complete enterprise security graph.</p>
+<hr/>
+<h2 id="5-validate-before-migrating">5. Validate Before Migrating</h2>
+<p>Rather than immediately migrating security controls, the platform validates:</p>
+<ul>
+<li>Cloud onboarding</li>
+<li>IAM permissions</li>
+<li>Runtime coverage</li>
+<li>Inventory freshness</li>
+<li>Connector health</li>
+<li>Policy availability</li>
+<li>Compliance coverage</li>
+<li>Runtime protection</li>
+</ul>
+<p>Migration only proceeds after validation succeeds.</p>
+<hr/>
+<h2 id="6-enterprise-reporting">6. Enterprise Reporting</h2>
+<p>Every discovery cycle generates:</p>
+<ul>
+<li>Executive dashboards</li>
+<li>Engineering dashboards</li>
+<li>Migration readiness</li>
+<li>Runtime coverage</li>
+<li>Compliance reports</li>
+<li>Inventory reports</li>
+<li>API health reports</li>
+<li>Business case reports</li>
+</ul>
+<hr/>
+<h1 id="why-this-framework-matters">Why This Framework Matters</h1>
+<p>Enterprise customers frequently encounter operational gaps that are not directly addressed by native product interfaces.</p>
+<p>Typical examples include:</p>
+<ul>
+<li>Determining whether every AWS account has been successfully onboarded.</li>
+<li>Verifying runtime protection across hundreds of Kubernetes clusters.</li>
+<li>Identifying stale cloud connectors.</li>
+<li>Comparing Prisma and Wiz coverage during migration.</li>
+<li>Producing executive-ready migration reports.</li>
+<li>Estimating engineering effort and implementation timelines.</li>
+</ul>
+<p>This framework automates those tasks and provides a consistent reporting layer across multiple cloud security platforms.</p>
+<hr/>
+<h1 id="business-justification">Business Justification</h1>
+<p>The framework reduces:</p>
+<ul>
+<li>Manual onboarding effort</li>
+<li>Migration risk</li>
+<li>Engineering hours</li>
+<li>Reporting complexity</li>
+<li>Operational overhead</li>
+</ul>
+<p>It increases:</p>
+<ul>
+<li>Automation</li>
+<li>Deployment quality</li>
+<li>Runtime visibility</li>
+<li>Executive visibility</li>
+<li>Security governance</li>
+<li>Migration confidence</li>
+</ul>
+<hr/>
+<h1 id="working-demo">Working Demo</h1>
+<p>The current implementation already demonstrates several core capabilities.</p>
+<p>Working modules include:</p>
+<h3 id="aws-onboarding-discovery">AWS Onboarding Discovery</h3>
+<ul>
+<li>AWS account discovery</li>
+<li>Cloud onboarding validation</li>
+<li>Runtime inventory</li>
+<li>SQLite reporting</li>
+</ul>
+<h3 id="image-vulnerability-reporting">Image Vulnerability Reporting</h3>
+<ul>
+<li>Container image discovery</li>
+<li>Vulnerability reporting</li>
+<li>Dashboard generation</li>
+</ul>
+<h3 id="host-vulnerability-reporting">Host Vulnerability Reporting</h3>
+<ul>
+<li>Host inventory</li>
+<li>Vulnerability analysis</li>
+<li>SQLite evidence</li>
+</ul>
+<h3 id="runtime-discovery">Runtime Discovery</h3>
+<ul>
+<li>Kubernetes inventory</li>
+<li>Defender validation</li>
+<li>Runtime coverage</li>
+</ul>
+<h3 id="dashboard-generation">Dashboard Generation</h3>
+<ul>
+<li>HTML reports</li>
+<li>SQLite dashboards</li>
+<li>Executive summaries</li>
+</ul>
+<p>These working scripts become the initial production modules.</p>
+<hr/>
+<h1 id="repository-philosophy">Repository Philosophy</h1>
+<p>The project evolves from a collection of standalone scripts into an enterprise platform.</p>
+<p>Instead of creating isolated utilities, every component becomes a reusable module.</p>
+<p>Design principles include:</p>
+<ul>
+<li>Modular architecture</li>
+<li>Plugin-based connectors</li>
+<li>Shared API framework</li>
+<li>Normalized data model</li>
+<li>Central evidence repository</li>
+<li>Independent reporting engine</li>
+<li>Vendor-neutral abstraction layer</li>
+</ul>
+<hr/>
+<h1 id="high-level-architecture">High-Level Architecture</h1>
+<pre><code class="language-text">                    Enterprise
+
+                         │
+                         ▼
+
+              Enterprise Discovery Engine
+                         │
+                         ▼
+
+               Asset Normalization Engine
+                         │
+                         ▼
+
+             SQLite Evidence Repository
+                         │
+                         ▼
+
+               Correlation Engine
+                         │
+                         ▼
+
+            Coverage Delta Engine
+                         │
+                         ▼
+
+         Onboarding Validation Engine
+                         │
+                         ▼
+
+         Migration Intelligence Engine
+                         │
+                         ▼
+
+          Runtime Planning Engine
+                         │
+                         ▼
+
+         Business Case Generator
+                         │
+                         ▼
+
+           Migration Execution
+                         │
+                         ▼
+
+      Continuous Drift Detection
+                         │
+                         ▼
+
+       Executive &amp; Engineering Reporting</code></pre>
+<hr/>
+<h1 id="repository-layout">Repository Layout</h1>
+<pre><code class="language-text">src/
+
+    core/
+
+    connectors/
+
+    discovery/
+
+    normalize/
+
+    correlate/
+
+    analysis/
+
+    migration/
+
+    validation/
+
+    reporting/
+
+    sqlite/
+
+    evidence/
+
+    cli/</code></pre>
+<hr/>
+<h1 id="core-framework">Core Framework</h1>
+<p>Every module shares common services:</p>
+<ul>
+<li>Configuration management</li>
+<li>Authentication</li>
+<li>HTTP client</li>
+<li>Retry engine</li>
+<li>Rate limiting</li>
+<li>Logging</li>
+<li>Metrics</li>
+<li>SQLite persistence</li>
+<li>Report generation</li>
+<li>Plugin loading</li>
+</ul>
+<p>No connector should implement these independently.</p>
+<hr/>
+<h1 id="enterprise-discovery-engine">Enterprise Discovery Engine</h1>
+<p>The Discovery Engine is the foundation of the platform.</p>
+<p>Its responsibilities are to:</p>
+<ul>
+<li>Discover enterprise assets</li>
+<li>Validate connectivity</li>
+<li>Inventory cloud resources</li>
+<li>Detect runtime coverage</li>
+<li>Identify onboarding gaps</li>
+<li>Normalize discovered objects</li>
+<li>Store evidence</li>
+<li>Trigger downstream analysis</li>
+</ul>
+<p>Every subsequent component—including reporting, migration, validation, and policy translation—depends on this normalized discovery layer.</p>
+<h1 id="readme-part-2">README Part 2</h1>
+<h2 id="repository-architecture-enterprise-discovery-platform-connectors">Repository Architecture, Enterprise Discovery &amp; Platform Connectors</h2>
+<hr/>
+<h1 id="repository-philosophy-2">Repository Philosophy</h1>
+<p>The framework is <strong>not a collection of scripts</strong>.</p>
+<p>It is a modular enterprise platform where every capability can operate independently or as part of a larger workflow.</p>
+<pre><code class="language-text">Enterprise
+    │
+    ▼
+Shared Core Framework
+    │
+    ├──────────────┬─────────────┬───────────────┐
+    ▼              ▼             ▼               ▼
+Discovery      Connectors    Reporting      Migration</code></pre>
+<p>Every module communicates through normalized objects rather than vendor-specific APIs.</p>
+<hr/>
+<h1 id="complete-repository-structure">Complete Repository Structure</h1>
+<pre><code class="language-text">enterprise-security-platform/
+
+README.md
+LICENSE
+CHANGELOG.md
+
+requirements.txt
+pyproject.toml
+
+/docker
+/docs
+/examples
+/tests
+/scripts
+
+src/
+
+    core/
+
+        config.py
+        constants.py
+        settings.py
+        logger.py
+        metrics.py
+        cache.py
+        retry.py
+        auth.py
+        api_client.py
+        async_client.py
+        exceptions.py
+        models.py
+        scheduler.py
+        plugin_loader.py
+
+------------------------------------------------
+
+    connectors/
+
+        prisma/
+
+            sdk/
+            compute/
+            cspm/
+            runtime/
+            appsec/
+
+        cortex/
+
+            cloud/
+            xsiam/
+            xdr/
+            appsec/
+
+        wiz/
+
+            graphql/
+            runtime/
+            connectors/
+            inventory/
+            reports/
+
+        aws/
+        azure/
+        gcp/
+
+        github/
+        gitlab/
+        bitbucket/
+
+        artifactory/
+        harbor/
+        nexus/
+
+------------------------------------------------
+
+    discovery/
+
+        cloud_engine/
+
+            EnterpriseCloudDiscovery/
+
+        enterprise/
+
+        aws/
+        azure/
+        gcp/
+
+        kubernetes/
+
+        runtime/
+
+        repositories/
+
+        registries/
+
+        cicd/
+
+        identity/
+
+------------------------------------------------
+
+    normalize/
+
+------------------------------------------------
+
+    correlate/
+
+------------------------------------------------
+
+    sqlite/
+
+------------------------------------------------
+
+    evidence/
+
+------------------------------------------------
+
+    analysis/
+
+        onboarding_validation/
+
+        coverage_delta/
+
+        migration_analysis/
+
+        runtime_analysis/
+
+        policy_translation/
+
+        business_case/
+
+        drift_detection/
+
+        api_health/
+
+        roi/
+
+------------------------------------------------
+
+    migration/
+
+------------------------------------------------
+
+    validation/
+
+------------------------------------------------
+
+    reporting/
+
+------------------------------------------------
+
+    api/
+
+------------------------------------------------
+
+    cli/</code></pre>
+<hr/>
+<h1 id="shared-core-framework">Shared Core Framework</h1>
+<p>Every connector shares one implementation.</p>
+<pre><code class="language-text">Authentication
+
+↓
+
+Retry Engine
+
+↓
+
+Rate Limiter
+
+↓
+
+HTTP Client
+
+↓
+
+Caching
+
+↓
+
+Logging
+
+↓
+
+SQLite
+
+↓
+
+Evidence Archive</code></pre>
+<p>No duplicate HTTP clients should exist.</p>
+<hr/>
+<h1 id="connector-layer">Connector Layer</h1>
+<p>The connector layer is responsible for communicating with vendor APIs.</p>
+<p>The rest of the framework never directly calls vendor APIs.</p>
+<pre><code class="language-text">Framework
+
+↓
+
+Connector
+
+↓
+
+Normalize
+
+↓
+
+SQLite
+
+↓
+
+Correlation
+
+↓
+
+Reporting</code></pre>
+<hr/>
+<h1 id="prisma-cloud-connector">Prisma Cloud Connector</h1>
+<p>Instead of creating another Prisma API library, reuse the existing SDK.</p>
+<pre><code class="language-text">SDK
+
+↓
+
+Discovery
+
+↓
+
+Normalization
+
+↓
+
+SQLite
+
+↓
+
+Reporting</code></pre>
+<p>Current SDK coverage</p>
+<h2 id="compute">Compute</h2>
+<ul>
+<li>Defenders</li>
+<li>Collections</li>
+<li>Hosts</li>
+<li>Containers</li>
+<li>Images</li>
+<li>Registry</li>
+<li>Runtime</li>
+<li>Compliance</li>
+<li>Policies</li>
+<li>Vulnerabilities</li>
+<li>Scans</li>
+<li>Serverless</li>
+<li>Logs</li>
+</ul>
+<hr/>
+<h2 id="cspm">CSPM</h2>
+<ul>
+<li>Cloud Accounts</li>
+<li>Account Groups</li>
+<li>Compliance</li>
+<li>Alerts</li>
+<li>Policies</li>
+<li>Rules</li>
+<li>Suppressions</li>
+<li>RQL</li>
+<li>Assets</li>
+</ul>
+<hr/>
+<h2 id="appsec">AppSec</h2>
+<ul>
+<li>Code Security</li>
+<li>Repositories</li>
+<li>Findings</li>
+<li>Secrets</li>
+<li>IaC</li>
+<li>Packages</li>
+<li>APIs</li>
+</ul>
+<hr/>
+<h1 id="wiz-connector">Wiz Connector</h1>
+<p>The Wiz connector should use GraphQL as the primary interface.</p>
+<pre><code class="language-text">GraphQL
+
+↓
+
+Projects
+
+↓
+
+Cloud Accounts
+
+↓
+
+Inventory
+
+↓
+
+Issues
+
+↓
+
+Cloud Configuration
+
+↓
+
+Runtime
+
+↓
+
+Attack Paths
+
+↓
+
+Reports</code></pre>
+<p>Additional integrations</p>
+<ul>
+<li>REST API</li>
+<li>Audit Logs</li>
+<li>EventBridge</li>
+<li>SNS</li>
+<li>SQS</li>
+<li>Export Jobs</li>
+</ul>
+<hr/>
+<h1 id="enterprise-discovery-engine-2">Enterprise Discovery Engine</h1>
+<p>Everything begins with discovery.</p>
+<pre><code class="language-text">Enterprise
+
+↓
+
+Cloud Providers
+
+↓
+
+Runtime
+
+↓
+
+Repositories
+
+↓
+
+Registries
+
+↓
+
+Identity
+
+↓
+
+Normalize
+
+↓
+
+Store</code></pre>
+<hr/>
+<h1 id="aws-discovery">AWS Discovery</h1>
+<p>Discover</p>
+<h2 id="organizations">Organizations</h2>
+<ul>
+<li>Management Account</li>
+<li>Organizational Units</li>
+<li>Member Accounts</li>
+</ul>
+<hr/>
+<h2 id="cloud-services">Cloud Services</h2>
+<ul>
+<li>CloudTrail</li>
+<li>AWS Config</li>
+<li>GuardDuty</li>
+<li>Inspector</li>
+<li>Security Hub</li>
+<li>EventBridge</li>
+<li>IAM</li>
+<li>KMS</li>
+</ul>
+<hr/>
+<h2 id="compute-2">Compute</h2>
+<ul>
+<li>EC2</li>
+<li>Lambda</li>
+<li>ECS</li>
+<li>EKS</li>
+<li>Auto Scaling</li>
+<li>ELB</li>
+</ul>
+<hr/>
+<h2 id="storage">Storage</h2>
+<ul>
+<li>S3</li>
+<li>EFS</li>
+<li>FSx</li>
+</ul>
+<hr/>
+<h2 id="containers">Containers</h2>
+<ul>
+<li>EKS</li>
+<li>ECS</li>
+<li>ECR</li>
+</ul>
+<hr/>
+<h2 id="networking">Networking</h2>
+<ul>
+<li>VPC</li>
+<li>Subnets</li>
+<li>Security Groups</li>
+<li>Route Tables</li>
+<li>Transit Gateway</li>
+<li>Internet Gateway</li>
+</ul>
+<hr/>
+<h2 id="identity">Identity</h2>
+<ul>
+<li>IAM Users</li>
+<li>IAM Roles</li>
+<li>Policies</li>
+<li>Trust Relationships</li>
+</ul>
+<hr/>
+<h2 id="validation">Validation</h2>
+<p>Automatically verify</p>
+<ul>
+<li>CloudTrail enabled</li>
+<li>Config enabled</li>
+<li>GuardDuty enabled</li>
+<li>Inspector enabled</li>
+<li>Security Hub enabled</li>
+<li>Required IAM permissions</li>
+<li>Required Regions</li>
+<li>Connector Health</li>
+</ul>
+<hr/>
+<h1 id="azure-discovery">Azure Discovery</h1>
+<p>Discover</p>
+<ul>
+<li>Tenants</li>
+<li>Management Groups</li>
+<li>Subscriptions</li>
+<li>Resource Groups</li>
+<li>VNets</li>
+<li>NSGs</li>
+<li>AKS</li>
+<li>Defender</li>
+<li>Key Vault</li>
+<li>Storage</li>
+<li>Identity</li>
+<li>Policies</li>
+</ul>
+<p>Validation</p>
+<ul>
+<li>Defender Enabled</li>
+<li>Security Center</li>
+<li>Subscription Health</li>
+<li>RBAC</li>
+<li>Resource Graph</li>
+</ul>
+<hr/>
+<h1 id="google-cloud-discovery">Google Cloud Discovery</h1>
+<p>Discover</p>
+<ul>
+<li>Organizations</li>
+<li>Folders</li>
+<li>Projects</li>
+<li>VPC</li>
+<li>GKE</li>
+<li>Artifact Registry</li>
+<li>Cloud Run</li>
+<li>Compute Engine</li>
+<li>IAM</li>
+<li>Cloud Logging</li>
+<li>SCC</li>
+</ul>
+<p>Validation</p>
+<ul>
+<li>APIs Enabled</li>
+<li>Security Command Center</li>
+<li>Organization Policies</li>
+<li>Runtime Coverage</li>
+</ul>
+<hr/>
+<h1 id="kubernetes-discovery">Kubernetes Discovery</h1>
+<p>Discover</p>
+<h2 id="cluster">Cluster</h2>
+<ul>
+<li>Version</li>
+<li>Distribution</li>
+<li>Cloud Provider</li>
+</ul>
+<hr/>
+<h2 id="nodes">Nodes</h2>
+<ul>
+<li>OS</li>
+<li>Runtime</li>
+<li>Kernel</li>
+</ul>
+<hr/>
+<h2 id="workloads">Workloads</h2>
+<ul>
+<li>Deployments</li>
+<li>StatefulSets</li>
+<li>DaemonSets</li>
+<li>Jobs</li>
+<li>CronJobs</li>
+</ul>
+<hr/>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li>Pods</li>
+<li>Containers</li>
+<li>Images</li>
+<li>Digests</li>
+</ul>
+<hr/>
+<h2 id="security">Security</h2>
+<ul>
+<li>RBAC</li>
+<li>Network Policies</li>
+<li>OPA</li>
+<li>Kyverno</li>
+<li>Admission Controllers</li>
+<li>Pod Security</li>
+</ul>
+<hr/>
+<h2 id="runtime-protection">Runtime Protection</h2>
+<ul>
+<li>Prisma Defender</li>
+<li>Wiz Runtime</li>
+<li>Runtime Policies</li>
+<li>Heartbeats</li>
+</ul>
+<hr/>
+<h1 id="repository-discovery">Repository Discovery</h1>
+<p>Supported</p>
+<ul>
+<li>GitHub</li>
+<li>GitLab</li>
+<li>Azure DevOps</li>
+<li>Bitbucket</li>
+</ul>
+<p>Discover</p>
+<ul>
+<li>Organizations</li>
+<li>Teams</li>
+<li>Repositories</li>
+<li>Branches</li>
+<li>CODEOWNERS</li>
+<li>Branch Protection</li>
+<li>GitHub Actions</li>
+<li>Secrets Metadata</li>
+<li>Releases</li>
+</ul>
+<p>Repository Analysis</p>
+<ul>
+<li>Terraform</li>
+<li>Helm</li>
+<li>Kubernetes YAML</li>
+<li>Dockerfiles</li>
+<li>API Specifications</li>
+<li>Python</li>
+<li>Go</li>
+<li>Java</li>
+<li>.NET</li>
+<li>Node.js</li>
+</ul>
+<p>Automatically recommend:</p>
+<ul>
+<li>Wiz CLI</li>
+<li>Cortex CLI</li>
+<li>Trivy</li>
+<li>Grype</li>
+<li>Syft</li>
+</ul>
+<hr/>
+<h1 id="registry-discovery">Registry Discovery</h1>
+<p>Supported</p>
+<ul>
+<li>Amazon ECR</li>
+<li>Azure ACR</li>
+<li>Google Artifact Registry</li>
+<li>DockerHub</li>
+<li>Artifactory</li>
+<li>Harbor</li>
+<li>Nexus</li>
+</ul>
+<p>Discover</p>
+<ul>
+<li>Images</li>
+<li>Digests</li>
+<li>Tags</li>
+<li>SBOMs</li>
+<li>Signatures</li>
+<li>Vulnerabilities</li>
+<li>Last Scan</li>
+<li>Owners</li>
+</ul>
+<hr/>
+<h1 id="ci-cd-discovery">CI/CD Discovery</h1>
+<p>Supported</p>
+<ul>
+<li>Jenkins</li>
+<li>GitHub Actions</li>
+<li>GitLab CI</li>
+<li>Azure DevOps</li>
+<li>Harness</li>
+</ul>
+<p>Discover</p>
+<ul>
+<li>Pipelines</li>
+<li>Secrets</li>
+<li>Runners</li>
+<li>Build History</li>
+<li>Deployments</li>
+<li>Artifacts</li>
+</ul>
+<hr/>
+<h1 id="identity-discovery">Identity Discovery</h1>
+<p>Supported</p>
+<ul>
+<li>AWS IAM</li>
+<li>Azure AD</li>
+<li>Entra ID</li>
+<li>Google IAM</li>
+<li>Okta</li>
+</ul>
+<p>Discover</p>
+<ul>
+<li>Users</li>
+<li>Groups</li>
+<li>Roles</li>
+<li>Federated Identity</li>
+<li>Service Accounts</li>
+<li>Trust Relationships</li>
+</ul>
+<hr/>
+<h1 id="sqlite-evidence-database">SQLite Evidence Database</h1>
+<p>Every discovered object is normalized before storage.</p>
+<p>Core tables include:</p>
+<pre><code class="language-text">organizations
+cloud_accounts
+regions
+clusters
+nodes
+namespaces
+pods
+containers
+images
+registries
+repositories
+pipelines
+runtime
+defenders
+wiz_connectors
+policies
+controls
+alerts
+findings
+owners
+tickets
+migration_jobs
+validation_results
+snapshots
+raw_api_archive</code></pre>
+<p>Every record stores:</p>
+<ul>
+<li>UUID</li>
+<li>Source Platform</li>
+<li>Source Object ID</li>
+<li>Parent UUID</li>
+<li>Owner</li>
+<li>Business Unit</li>
+<li>Tags</li>
+<li>Metadata</li>
+<li>First Seen</li>
+<li>Last Seen</li>
+<li>Risk Score</li>
+<li>Validation Status</li>
+<li>Migration Status</li>
+</ul>
+<hr/>
+<h1 id="evidence-repository">Evidence Repository</h1>
+<p>Every API response is archived.</p>
+<pre><code class="language-text">API Response
+
+↓
+
+Normalization
+
+↓
+
+SQLite
+
+↓
+
+Raw JSON Archive
+
+↓
+
+Evidence Bundle
+
+↓
+
+Executive Report</code></pre>
+<p>This allows:</p>
+<ul>
+<li>auditability</li>
+<li>reproducibility</li>
+<li>offline reporting</li>
+<li>migration validation</li>
+<li>compliance evidence</li>
+</ul>
+<hr/>
+<h1 id="readme-part-3">README Part 3</h1>
+<h2 id="intelligence-engine-coverage-analysis-migration-planning">Intelligence Engine, Coverage Analysis &amp; Migration Planning</h2>
+<hr/>
+<h1 id="table-of-contents-2">Table of Contents</h1>
+<pre><code class="language-text">13. Cross Platform Correlation Engine
+14. Coverage Delta Engine
+15. Onboarding Validation Engine
+16. Runtime Planning Engine
+17. Defender Replacement Engine
+18. Migration Intelligence Engine
+19. Policy Translation Engine
+20. Compatibility Engine
+21. Engineering Work Queue
+22. Business Case Generator
+23. Continuous Drift Detection
+24. API Health Monitoring
+25. Recommendation Engine</code></pre>
+<hr/>
+<h1 id="enterprise-intelligence-layer">Enterprise Intelligence Layer</h1>
+<p>The Discovery Engine inventories enterprise assets.</p>
+<p>The Intelligence Layer transforms inventory into actionable engineering work.</p>
+<pre><code class="language-text">Discovery
+
+↓
+
+Normalization
+
+↓
+
+Correlation
+
+↓
+
+Coverage Analysis
+
+↓
+
+Gap Analysis
+
+↓
+
+Migration Planning
+
+↓
+
+Engineering Tasks
+
+↓
+
+Executive Reports</code></pre>
+<p>Unlike vendor dashboards, this layer answers operational questions rather than simply displaying security findings.</p>
+<hr/>
+<h1 id="cross-platform-correlation-engine">Cross Platform Correlation Engine</h1>
+<p>The Correlation Engine is the heart of the platform.</p>
+<p>It builds one enterprise graph from multiple systems.</p>
+<pre><code class="language-text">AWS Account
+
+↓
+
+AWS Organization
+
+↓
+
+Region
+
+↓
+
+VPC
+
+↓
+
+Cluster
+
+↓
+
+Namespace
+
+↓
+
+Deployment
+
+↓
+
+Pod
+
+↓
+
+Container
+
+↓
+
+Image Digest
+
+↓
+
+Registry
+
+↓
+
+Repository
+
+↓
+
+Commit
+
+↓
+
+Pipeline
+
+↓
+
+SBOM
+
+↓
+
+CVE
+
+↓
+
+Runtime Alert
+
+↓
+
+Policy
+
+↓
+
+Owner
+
+↓
+
+Business Unit
+
+↓
+
+Jira
+
+↓
+
+ServiceNow</code></pre>
+<p>This relationship graph allows every report to answer questions that individual products cannot.</p>
+<hr/>
+<h1 id="enterprise-asset-graph">Enterprise Asset Graph</h1>
+<p>Each object maintains relationships.</p>
+<pre><code class="language-text">Cloud Account
+
+↓
+
+Cluster
+
+↓
+
+Namespace
+
+↓
+
+Pod
+
+↓
+
+Container
+
+↓
+
+Image
+
+↓
+
+Registry
+
+↓
+
+Repository
+
+↓
+
+Developer
+
+↓
+
+Team
+
+↓
+
+Business Unit</code></pre>
+<p>Everything becomes searchable.</p>
+<hr/>
+<h1 id="coverage-delta-engine">Coverage Delta Engine</h1>
+<p>This is one of the primary differentiators.</p>
+<p>Instead of reporting one platform, compare both simultaneously.</p>
+<pre><code class="language-text">Prisma
+
++
+
+Wiz
+
++
+
+AWS
+
++
+
+Kubernetes
+
+↓
+
+Coverage Delta</code></pre>
+<hr/>
+<h2 id="coverage-categories">Coverage Categories</h2>
+<p>Protected by Prisma</p>
+<p>Protected by Wiz</p>
+<p>Protected by Both</p>
+<p>Not Protected</p>
+<p>Unknown</p>
+<p>Manual Validation</p>
+<hr/>
+<h2 id="example-report">Example Report</h2>
+<pre><code class="language-text">AWS Accounts
+
+148
+
+Protected by Prisma
+
+142
+
+Protected by Wiz
+
+117
+
+Protected by Both
+
+113
+
+Migration Ready
+
+109
+
+Need Runtime
+
+21
+
+Missing Protection
+
+6</code></pre>
+<hr/>
+<h2 id="cluster-coverage">Cluster Coverage</h2>
+<pre><code class="language-text">Cluster
+
+Production-EKS
+
+Prisma Runtime
+
+Healthy
+
+Wiz Runtime
+
+Missing
+
+Recommendation
+
+Deploy Wiz Runtime
+
+Priority
+
+High</code></pre>
+<hr/>
+<h1 id="runtime-coverage-analysis">Runtime Coverage Analysis</h1>
+<p>Every runtime workload is analyzed.</p>
+<pre><code class="language-text">Cluster
+
+↓
+
+Namespace
+
+↓
+
+Deployment
+
+↓
+
+Container
+
+↓
+
+Runtime
+
+↓
+
+Defender
+
+↓
+
+Runtime Policy
+
+↓
+
+Coverage</code></pre>
+<p>Metrics</p>
+<p>Runtime %</p>
+<p>Container %</p>
+<p>Cluster %</p>
+<p>Policy %</p>
+<p>Defender %</p>
+<hr/>
+<h1 id="defender-replacement-engine">Defender Replacement Engine</h1>
+<p>Instead of simply listing Defenders, determine whether they can be retired.</p>
+<p>Workflow</p>
+<pre><code class="language-text">Existing Defender
+
+↓
+
+Heartbeat
+
+↓
+
+Runtime Policies
+
+↓
+
+Collections
+
+↓
+
+Equivalent Wiz Runtime
+
+↓
+
+Parallel Validation
+
+↓
+
+Production Validation
+
+↓
+
+Remove Defender</code></pre>
+<hr/>
+<h2 id="replacement-categories">Replacement Categories</h2>
+<p>Keep Defender</p>
+<p>Replace with Wiz Runtime</p>
+<p>Deploy Wiz Connector</p>
+<p>Deploy Wiz Sensor</p>
+<p>Manual Review</p>
+<p>Unsupported</p>
+<hr/>
+<h2 id="example">Example</h2>
+<pre><code class="language-text">Cluster
+
+payments-prod
+
+Prisma Defender
+
+Healthy
+
+Collections
+
+15
+
+Runtime Policies
+
+18
+
+Equivalent Wiz Coverage
+
+98%
+
+Recommendation
+
+Deploy Wiz Runtime
+
+Parallel Validation
+
+Remove Defender</code></pre>
+<hr/>
+<h1 id="runtime-planner">Runtime Planner</h1>
+<p>Migration order matters.</p>
+<p>The planner determines deployment order.</p>
+<pre><code class="language-text">Cloud
+
+↓
+
+Cluster
+
+↓
+
+Runtime
+
+↓
+
+Connector
+
+↓
+
+Policy
+
+↓
+
+Validation
+
+↓
+
+Migration
+
+↓
+
+Cutover</code></pre>
+<hr/>
+<h1 id="onboarding-validation-engine">Onboarding Validation Engine</h1>
+<p>This engine verifies that onboarding is production ready.</p>
+<p>Checks</p>
+<p>AWS</p>
+<ul>
+<li>CloudTrail</li>
+<li>Config</li>
+<li>GuardDuty</li>
+<li>Inspector</li>
+<li>Security Hub</li>
+<li>IAM</li>
+<li>Organizations</li>
+<li>Regions</li>
+</ul>
+<p>Prisma</p>
+<ul>
+<li>Account Groups</li>
+<li>Collections</li>
+<li>Runtime</li>
+<li>Defenders</li>
+<li>Policies</li>
+<li>Compliance</li>
+</ul>
+<p>Wiz</p>
+<ul>
+<li>Connectors</li>
+<li>Projects</li>
+<li>Runtime</li>
+<li>Inventory</li>
+<li>Cloud Config</li>
+<li>Integrations</li>
+</ul>
+<hr/>
+<h2 id="validation-result">Validation Result</h2>
+<pre><code class="language-text">AWS Account
+
+123456789012
+
+CloudTrail
+
+PASS
+
+Config
+
+FAIL
+
+Inspector
+
+PASS
+
+GuardDuty
+
+PASS
+
+Runtime
+
+FAIL
+
+Recommendation
+
+Not Production Ready</code></pre>
+<hr/>
+<h1 id="migration-readiness-engine">Migration Readiness Engine</h1>
+<p>Every discovered object receives a readiness score.</p>
+<pre><code class="language-text">Discovery
+
+↓
+
+Validation
+
+↓
+
+Coverage
+
+↓
+
+Compatibility
+
+↓
+
+Engineering Work
+
+↓
+
+Migration Ready</code></pre>
+<hr/>
+<h2 id="readiness-score">Readiness Score</h2>
+<pre><code class="language-text">Cloud Discovery
+
+100%
+
+Runtime
+
+81%
+
+Policies
+
+92%
+
+Repositories
+
+96%
+
+Images
+
+95%
+
+Connector Health
+
+100%
+
+Migration Readiness
+
+93%</code></pre>
+<hr/>
+<h1 id="policy-translation-engine">Policy Translation Engine</h1>
+<p>Translate vendor-specific policies into normalized objects.</p>
+<pre><code class="language-text">Prisma Policy
+
+↓
+
+Normalized JSON
+
+↓
+
+Compatibility Engine
+
+↓
+
+Equivalent Wiz Policy
+
+↓
+
+Validation
+
+↓
+
+Migration</code></pre>
+<hr/>
+<h2 id="translation-status">Translation Status</h2>
+<p>Exact Match</p>
+<p>Close Match</p>
+<p>Partial Match</p>
+<p>Manual Review</p>
+<p>Unsupported</p>
+<hr/>
+<h2 id="policy-mapping">Policy Mapping</h2>
+<p>Preserve</p>
+<p>Severity</p>
+<p>Description</p>
+<p>Scope</p>
+<p>Cloud Accounts</p>
+<p>Projects</p>
+<p>Tags</p>
+<p>Compliance Mapping</p>
+<p>Exceptions</p>
+<p>Suppressions</p>
+<p>Owner</p>
+<p>Remediation</p>
+<hr/>
+<h1 id="compatibility-engine">Compatibility Engine</h1>
+<p>Determine whether migration can be automated.</p>
+<p>Categories</p>
+<p>100%</p>
+<p>Automated</p>
+<p>90%</p>
+<p>Automated with Validation</p>
+<p>70%</p>
+<p>Minor Manual Review</p>
+<p>50%</p>
+<p>Partial Migration</p>
+<p>0%</p>
+<p>Unsupported</p>
+<hr/>
+<h1 id="migration-intelligence-engine">Migration Intelligence Engine</h1>
+<p>Migration workflow</p>
+<pre><code class="language-text">Discover
+
+↓
+
+Normalize
+
+↓
+
+Correlate
+
+↓
+
+Compatibility
+
+↓
+
+Engineering Plan
+
+↓
+
+Dry Run
+
+↓
+
+Approval
+
+↓
+
+Migration
+
+↓
+
+Validation
+
+↓
+
+Cutover
+
+↓
+
+Drift Monitoring</code></pre>
+<hr/>
+<h1 id="dry-run-engine">Dry Run Engine</h1>
+<p>No production changes.</p>
+<p>Produces</p>
+<p>Migration Report</p>
+<p>Compatibility Matrix</p>
+<p>Risk Assessment</p>
+<p>Rollback Plan</p>
+<p>Engineering Estimate</p>
+<hr/>
+<h1 id="rollback-planning">Rollback Planning</h1>
+<p>Every migration stores</p>
+<p>Original State</p>
+<p>↓</p>
+<p>Migration Plan</p>
+<p>↓</p>
+<p>Validation</p>
+<p>↓</p>
+<p>Rollback Steps</p>
+<p>↓</p>
+<p>Evidence</p>
+<hr/>
+<h1 id="engineering-work-queue">Engineering Work Queue</h1>
+<p>Automatically create engineering tasks.</p>
+<pre><code class="language-text">Deploy Wiz Runtime
+
+18 Clusters
+
+Deploy Connector
+
+5 AWS Accounts
+
+Enable Config
+
+7 Accounts
+
+Install Runtime
+
+3 Clusters
+
+Remove Defender
+
+11 Clusters
+
+Validate Runtime
+
+18 Clusters</code></pre>
+<p>Export</p>
+<p>Jira</p>
+<p>ServiceNow</p>
+<p>Azure DevOps</p>
+<p>CSV</p>
+<hr/>
+<h1 id="recommendation-engine">Recommendation Engine</h1>
+<p>Every discovered object receives recommendations.</p>
+<p>Example</p>
+<pre><code class="language-text">Repository
+
+payments-api
+
+Terraform
+
+Detected
+
+Dockerfile
+
+Detected
+
+Recommended
+
+Run Wiz CLI
+
+Generate SBOM
+
+Run Trivy
+
+Store Results</code></pre>
+<hr/>
+<h1 id="business-case-generator">Business Case Generator</h1>
+<p>Produce executive metrics.</p>
+<p>Calculate</p>
+<p>Engineering Hours</p>
+<p>Automation %</p>
+<p>Migration Timeline</p>
+<p>Professional Services</p>
+<p>Infrastructure</p>
+<p>Operational Savings</p>
+<p>ROI</p>
+<hr/>
+<h2 id="example-2">Example</h2>
+<pre><code class="language-text">Current Manual Work
+
+920 Hours
+
+Automation
+
+710 Hours
+
+Engineering Saved
+
+210 Hours
+
+Estimated Savings
+
+$84,000</code></pre>
+<hr/>
+<h1 id="executive-migration-scorecard">Executive Migration Scorecard</h1>
+<pre><code class="language-text">Cloud Accounts
+
+148
+
+Clusters
+
+67
+
+Repositories
+
+2,184
+
+Registries
+
+26
+
+Protected
+
+91%
+
+Migration Ready
+
+84%
+
+Remaining Tasks
+
+43
+
+Automation
+
+88%
+
+Estimated Completion
+
+19 Days</code></pre>
+<hr/>
+<h1 id="continuous-drift-detection">Continuous Drift Detection</h1>
+<p>Continuously monitor the environment.</p>
+<p>Detect</p>
+<p>Connector Failure</p>
+<p>Runtime Failure</p>
+<p>Policy Drift</p>
+<p>Permission Drift</p>
+<p>Coverage Drift</p>
+<p>Inventory Drift</p>
+<p>Defender Offline</p>
+<p>Wiz Connector Offline</p>
+<p>New AWS Accounts</p>
+<p>New Kubernetes Clusters</p>
+<p>New Registries</p>
+<p>Missing Runtime</p>
+<hr/>
+<h1 id="api-health-monitoring">API Health Monitoring</h1>
+<p>Track every connector.</p>
+<pre><code class="language-text">Platform
+
+API Calls
+
+Latency
+
+Retries
+
+Errors
+
+Rate Limits
+
+Availability
+
+Last Success</code></pre>
+<hr/>
+<h1 id="evidence-preservation">Evidence Preservation</h1>
+<p>Every recommendation links back to evidence.</p>
+<pre><code class="language-text">API Response
+
+↓
+
+Normalized Object
+
+↓
+
+SQLite
+
+↓
+
+Evidence Archive
+
+↓
+
+Migration Report
+
+↓
+
+Executive Dashboard</code></pre>
+<p>Nothing is generated without traceable evidence.</p>
+<h1 id="readme-part-4">README Part 4</h1>
+<h2 id="enterprise-dashboards-apis-deployment-security-roadmap-future-vision">Enterprise Dashboards, APIs, Deployment, Security, Roadmap &amp; Future Vision</h2>
+<hr/>
+<h1 id="table-of-contents-3">Table of Contents</h1>
+<pre><code class="language-text">26. Executive Dashboard
+27. Engineering Dashboard
+28. Compliance Dashboard
+29. Migration Dashboard
+30. Runtime Dashboard
+31. REST API
+32. CLI
+33. Plugin SDK
+34. Reporting Framework
+35. SQLite Schema
+36. Security Model
+37. Deployment Architecture
+38. CI/CD Integration
+39. Testing Strategy
+40. Multi-Tenant Architecture
+41. AI Security Discovery
+42. MCP Discovery
+43. Future Modules
+44. Complete Development Roadmap
+45. Enterprise Vision</code></pre>
+<hr/>
+<h1 id="executive-dashboard">Executive Dashboard</h1>
+<p>Executives should never need to understand vendor-specific terminology.</p>
+<p>The dashboard focuses on business outcomes.</p>
+<h2 id="executive-kpis">Executive KPIs</h2>
+<pre><code class="language-text">Cloud Accounts
+
+Azure Subscriptions
+
+GCP Projects
+
+Kubernetes Clusters
+
+Repositories
+
+Container Images
+
+Registries
+
+Runtime Coverage
+
+Compliance Score
+
+Migration Readiness
+
+Engineering Hours Saved
+
+Automation %
+
+Estimated Cost Savings
+
+ROI
+
+Remaining Migration Tasks</code></pre>
+<hr/>
+<h2 id="executive-home-page">Executive Home Page</h2>
+<pre><code class="language-text">Enterprise Overview
+
+Cloud Accounts
+148
+
+Clusters
+71
+
+Repositories
+2,415
+
+Images
+37,812
+
+Protected Assets
+93%
+
+Migration Ready
+88%
+
+Engineering Tasks Remaining
+37
+
+Estimated Completion
+14 Days
+
+Estimated Savings
+$215,000</code></pre>
+<hr/>
+<h1 id="engineering-dashboard">Engineering Dashboard</h1>
+<p>Engineering needs operational visibility.</p>
+<p>Displays</p>
+<pre><code class="language-text">Connector Health
+
+Runtime Coverage
+
+Defender Status
+
+Wiz Runtime
+
+Inventory Age
+
+API Errors
+
+Policy Drift
+
+Permission Drift
+
+Migration Queue
+
+Failed Validation</code></pre>
+<hr/>
+<h1 id="runtime-dashboard">Runtime Dashboard</h1>
+<pre><code class="language-text">Cloud
+
+↓
+
+Cluster
+
+↓
+
+Namespace
+
+↓
+
+Deployment
+
+↓
+
+Container
+
+↓
+
+Runtime
+
+↓
+
+Policy
+
+↓
+
+Coverage
+
+↓
+
+Alerts</code></pre>
+<p>Shows</p>
+<ul>
+<li>Defender heartbeat</li>
+<li>Wiz runtime health</li>
+<li>Runtime policy coverage</li>
+<li>Runtime alerts</li>
+<li>Container inventory</li>
+<li>Vulnerabilities</li>
+<li>Runtime drift</li>
+</ul>
+<hr/>
+<h1 id="migration-dashboard">Migration Dashboard</h1>
+<p>Displays migration progress.</p>
+<pre><code class="language-text">Discovery
+
+↓
+
+Validation
+
+↓
+
+Compatibility
+
+↓
+
+Dry Run
+
+↓
+
+Approval
+
+↓
+
+Migration
+
+↓
+
+Validation
+
+↓
+
+Defender Removal
+
+↓
+
+Complete</code></pre>
+<p>Progress tracked by:</p>
+<ul>
+<li>Account</li>
+<li>Cluster</li>
+<li>Repository</li>
+<li>Registry</li>
+<li>Policy</li>
+<li>Runtime</li>
+</ul>
+<hr/>
+<h1 id="compliance-dashboard">Compliance Dashboard</h1>
+<p>Supported frameworks</p>
+<ul>
+<li>CIS</li>
+<li>NIST</li>
+<li>PCI DSS</li>
+<li>SOC2</li>
+<li>HIPAA</li>
+<li>ISO 27001</li>
+</ul>
+<p>Displays</p>
+<pre><code class="language-text">Framework
+
+Controls
+
+Passed
+
+Failed
+
+Exceptions
+
+Evidence
+
+Owner</code></pre>
+<hr/>
+<h1 id="rest-api">REST API</h1>
+<p>Every module exposes REST endpoints.</p>
+<pre><code class="language-text">/api/v1/discovery
+
+/api/v1/runtime
+
+/api/v1/reporting
+
+/api/v1/migration
+
+/api/v1/validation
+
+/api/v1/evidence
+
+/api/v1/connectors
+
+/api/v1/dashboard
+
+/api/v1/health</code></pre>
+<hr/>
+<h1 id="graphql-api">GraphQL API</h1>
+<p>Expose normalized enterprise inventory.</p>
+<p>Example</p>
+<pre><code class="language-graphql">query {
+
+    clusters {
+
+        name
+
+        runtime
+
+        owner
+
+        migrationStatus
+
+        coverage
+
+    }
+
+}</code></pre>
+<hr/>
+<h1 id="cli">CLI</h1>
+<pre><code class="language-bash">enterprise discover
+
+enterprise inventory
+
+enterprise runtime
+
+enterprise report
+
+enterprise validate
+
+enterprise coverage
+
+enterprise migrate
+
+enterprise rollback
+
+enterprise dashboard
+
+enterprise drift
+
+enterprise health</code></pre>
+<hr/>
+<h1 id="plugin-sdk">Plugin SDK</h1>
+<p>New vendors should require minimal code.</p>
+<pre><code class="language-python">class Connector:
+
+    discover()
+
+    normalize()
+
+    validate()
+
+    report()
+
+    migrate()</code></pre>
+<p>Examples</p>
+<ul>
+<li>Prisma</li>
+<li>Wiz</li>
+<li>Azure</li>
+<li>AWS</li>
+<li>GitHub</li>
+<li>Artifactory</li>
+</ul>
+<hr/>
+<h1 id="reporting-framework">Reporting Framework</h1>
+<p>Supported outputs</p>
+<p>HTML</p>
+<p>Markdown</p>
+<p>PDF</p>
+<p>Excel</p>
+<p>JSON</p>
+<p>CSV</p>
+<p>PowerPoint</p>
+<p>Executive Summary</p>
+<p>Engineering Report</p>
+<p>Compliance Package</p>
+<p>Migration Package</p>
+<p>Evidence Bundle</p>
+<hr/>
+<h1 id="sqlite-evidence-schema">SQLite Evidence Schema</h1>
+<p>Core tables</p>
+<pre><code class="language-text">organizations
+
+cloud_accounts
+
+regions
+
+clusters
+
+nodes
+
+namespaces
+
+deployments
+
+pods
+
+containers
+
+images
+
+registries
+
+repositories
+
+pipelines
+
+sboms
+
+findings
+
+policies
+
+controls
+
+runtime
+
+defenders
+
+wiz_connectors
+
+owners
+
+business_units
+
+tickets
+
+migration_jobs
+
+migration_objects
+
+validation_results
+
+compatibility_results
+
+raw_api_archive
+
+report_history
+
+snapshots
+
+api_logs</code></pre>
+<p>Each object stores</p>
+<pre><code class="language-text">UUID
+
+Platform
+
+Source ID
+
+Parent
+
+Owner
+
+Business Unit
+
+Tags
+
+Metadata
+
+Risk Score
+
+Validation Status
+
+Migration Status
+
+First Seen
+
+Last Seen
+
+Checksum</code></pre>
+<hr/>
+<h1 id="security-model">Security Model</h1>
+<p>Authentication</p>
+<ul>
+<li>OAuth2</li>
+<li>API Keys</li>
+<li>AWS IAM</li>
+<li>Azure Entra ID</li>
+<li>Google IAM</li>
+</ul>
+<p>Authorization</p>
+<ul>
+<li>RBAC</li>
+<li>Team Based</li>
+<li>Business Unit</li>
+<li>Project Based</li>
+</ul>
+<p>Secrets</p>
+<ul>
+<li>HashiCorp Vault</li>
+<li>AWS Secrets Manager</li>
+<li>Azure Key Vault</li>
+<li>GCP Secret Manager</li>
+</ul>
+<p>Audit</p>
+<p>Every API request</p>
+<p>Every migration</p>
+<p>Every report</p>
+<p>Every policy change</p>
+<p>Every validation</p>
+<hr/>
+<h1 id="deployment">Deployment</h1>
+<p>Supported</p>
+<p>Docker</p>
+<p>Docker Compose</p>
+<p>Kubernetes</p>
+<p>Helm</p>
+<p>AWS ECS</p>
+<p>Azure Container Apps</p>
+<p>Google Cloud Run</p>
+<hr/>
+<h2 id="microservice-architecture">Microservice Architecture</h2>
+<pre><code class="language-text">Gateway
+
+↓
+
+Discovery Service
+
+↓
+
+Correlation Service
+
+↓
+
+Reporting Service
+
+↓
+
+Migration Service
+
+↓
+
+Evidence Service
+
+↓
+
+SQLite/PostgreSQL</code></pre>
+<hr/>
+<h1 id="ci-cd-integration">CI/CD Integration</h1>
+<p>Supported</p>
+<p>GitHub Actions</p>
+<p>GitLab CI</p>
+<p>Azure DevOps</p>
+<p>Jenkins</p>
+<p>Harness</p>
+<p>CircleCI</p>
+<p>Typical pipeline</p>
+<pre><code class="language-text">Commit
+
+↓
+
+Build
+
+↓
+
+SBOM
+
+↓
+
+Scan
+
+↓
+
+Normalize
+
+↓
+
+Evidence
+
+↓
+
+Policy Validation
+
+↓
+
+Deployment</code></pre>
+<hr/>
+<h1 id="testing-strategy">Testing Strategy</h1>
+<p>Unit Tests</p>
+<p>Integration Tests</p>
+<p>API Tests</p>
+<p>Performance Tests</p>
+<p>Migration Tests</p>
+<p>Rollback Tests</p>
+<p>SDK Compatibility Tests</p>
+<p>Regression Tests</p>
+<hr/>
+<h1 id="multi-tenant-architecture">Multi-Tenant Architecture</h1>
+<p>Support</p>
+<p>Enterprise</p>
+<p>Business Unit</p>
+<p>Project</p>
+<p>Managed Service Providers (MSSP)</p>
+<pre><code class="language-text">Tenant
+
+↓
+
+Business Unit
+
+↓
+
+Cloud Accounts
+
+↓
+
+Projects
+
+↓
+
+Reports
+
+↓
+
+Evidence</code></pre>
+<hr/>
+<h1 id="ai-security-discovery">AI Security Discovery</h1>
+<p>Future module</p>
+<p>Discover</p>
+<p>OpenAI</p>
+<p>Azure OpenAI</p>
+<p>Amazon Bedrock</p>
+<p>Vertex AI</p>
+<p>Anthropic</p>
+<p>SageMaker</p>
+<hr/>
+<p>Discover</p>
+<p>AI Models</p>
+<p>Prompts</p>
+<p>Vector Databases</p>
+<p>Embeddings</p>
+<p>AI Secrets</p>
+<p>AI APIs</p>
+<p>Model Endpoints</p>
+<p>Inference Runtime</p>
+<hr/>
+<h1 id="mcp-discovery">MCP Discovery</h1>
+<p>Future capability</p>
+<p>Discover</p>
+<p>MCP Servers</p>
+<p>Connected Tools</p>
+<p>Tool Permissions</p>
+<p>Secrets</p>
+<p>Models</p>
+<p>Runtime</p>
+<p>Audit Logs</p>
+<p>Policies</p>
+<hr/>
+<h1 id="future-platform-modules">Future Platform Modules</h1>
+<p>Cloud</p>
+<ul>
+<li>OCI</li>
+<li>Alibaba</li>
+<li>DigitalOcean</li>
+</ul>
+<p>Containers</p>
+<ul>
+<li>OpenShift</li>
+<li>Rancher</li>
+</ul>
+<p>Security</p>
+<ul>
+<li>Tenable</li>
+<li>Orca</li>
+<li>Lacework</li>
+<li>Aqua</li>
+<li>Check Point</li>
+</ul>
+<p>Identity</p>
+<ul>
+<li>Okta</li>
+<li>Ping</li>
+<li>CyberArk</li>
+</ul>
+<p>Observability</p>
+<ul>
+<li>Datadog</li>
+<li>Grafana</li>
+<li>Splunk</li>
+<li>Elastic</li>
+</ul>
+<hr/>
+<h1 id="development-roadmap">Development Roadmap</h1>
+<h2 id="version-1">Version 1</h2>
+<p>Working Demo</p>
+<ul>
+<li>AWS onboarding</li>
+<li>Runtime reports</li>
+<li>SQLite</li>
+<li>Dashboard</li>
+</ul>
+<hr/>
+<h2 id="version-2">Version 2</h2>
+<p>Enterprise Discovery</p>
+<ul>
+<li>AWS</li>
+<li>Azure</li>
+<li>GCP</li>
+<li>Kubernetes</li>
+</ul>
+<hr/>
+<h2 id="version-3">Version 3</h2>
+<p>Platform Connectors</p>
+<ul>
+<li>Prisma SDK</li>
+<li>Wiz GraphQL</li>
+<li>GitHub</li>
+<li>Artifactory</li>
+</ul>
+<hr/>
+<h2 id="version-4">Version 4</h2>
+<p>Enterprise Intelligence</p>
+<ul>
+<li>Coverage Delta</li>
+<li>Onboarding Validation</li>
+<li>Defender Replacement</li>
+<li>Runtime Planning</li>
+<li>Policy Translation</li>
+<li>Engineering Queue</li>
+</ul>
+<hr/>
+<h2 id="version-5">Version 5</h2>
+<p>Enterprise Reporting</p>
+<ul>
+<li>Executive Dashboard</li>
+<li>Engineering Dashboard</li>
+<li>Compliance</li>
+<li>Migration Dashboard</li>
+<li>ROI Dashboard</li>
+</ul>
+<hr/>
+<h2 id="version-6">Version 6</h2>
+<p>Migration Automation</p>
+<ul>
+<li>Dry Run</li>
+<li>Validation</li>
+<li>Rollback</li>
+<li>Evidence Packages</li>
+</ul>
+<hr/>
+<h2 id="version-7">Version 7</h2>
+<p>Enterprise SaaS Platform</p>
+<ul>
+<li>Web UI</li>
+<li>REST API</li>
+<li>GraphQL</li>
+<li>Multi-Tenant</li>
+<li>Role-Based Access Control</li>
+<li>Scheduler</li>
+<li>Continuous Drift Detection</li>
+</ul>
+<hr/>
+<h1 id="competitive-advantages">Competitive Advantages</h1>
+<p>The platform differentiates itself by combining capabilities that are typically spread across multiple tools:</p>
+<ul>
+<li><strong>Vendor-neutral discovery</strong> across cloud providers, Kubernetes, repositories, registries, CI/CD, and identity systems.</li>
+<li><strong>Unified evidence repository</strong> with normalized data and full auditability.</li>
+<li><strong>Coverage Delta Engine</strong> to compare Prisma Cloud and Wiz environments during migration.</li>
+<li><strong>Defender-to-Wiz migration planning</strong> with runtime validation and phased cutover recommendations.</li>
+<li><strong>Business Case Generator</strong> that estimates engineering effort, migration timeline, automation percentage, and ROI.</li>
+<li><strong>Continuous Drift Detection</strong> for onboarding health, runtime coverage, permissions, and policy changes.</li>
+<li><strong>Cross-platform asset correlation</strong> linking cloud resources, runtime, repositories, pipelines, SBOMs, vulnerabilities, and ownership into a single enterprise graph.</li>
+</ul>
+<hr/>
+<h1 id="final-vision">Final Vision</h1>
+<p>The long-term objective is to build an <strong>Enterprise Cloud Security Operations Platform</strong> rather than another security scanner.</p>
+<p>The platform should enable organizations to:</p>
+<ul>
+<li>Discover and inventory enterprise cloud environments.</li>
+<li>Validate onboarding into Wiz, Prisma Cloud, or Cortex Cloud.</li>
+<li>Continuously monitor coverage and operational health.</li>
+<li>Correlate assets across cloud, runtime, source control, registries, and CI/CD.</li>
+<li>Plan, validate, and execute migrations with measurable risk reduction.</li>
+<li>Generate executive, engineering, compliance, and audit-ready reports from a single normalized data model.</li>
+</ul>
+<p>By separating <strong>discovery, normalization, correlation, reporting, and migration</strong> from any single vendor implementation, the framework becomes a reusable enterprise automation platform that can evolve alongside future cloud security products while preserving operational visibility, governance, and migration intelligence.</p>
+</article><footer style="margin-top:30px;padding:22px 4px;color:#7f91ae;font-size:12px;border-top:1px solid #263955">Enterprise Cloud Security Platform — Executive Edition • Detailed engineering content preserved in full</footer></main></div><script>document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.body.classList.remove('executive-only');}});</script></body></html>

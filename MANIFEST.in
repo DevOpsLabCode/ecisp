@@ -1,0 +1,17 @@
+include LICENSE
+include README.md
+include requirements.txt
+recursive-include EnterpriseCloudDiscovery/data *
+recursive-include EnterpriseCloudDiscovery/output/data *
+recursive-include EnterpriseCloudDiscovery/providers/aws *
+recursive-include EnterpriseCloudDiscovery/providers/aws/rules *
+recursive-include EnterpriseCloudDiscovery/providers/azure *
+recursive-include EnterpriseCloudDiscovery/providers/azure/rules *
+recursive-include EnterpriseCloudDiscovery/providers/gcp *
+recursive-include EnterpriseCloudDiscovery/providers/gcp/rules *
+recursive-include EnterpriseCloudDiscovery/providers/aliyun *
+recursive-include EnterpriseCloudDiscovery/providers/aliyun/rules *
+recursive-include EnterpriseCloudDiscovery/providers/oci *
+recursive-include EnterpriseCloudDiscovery/providers/oci/rules *
+recursive-include EnterpriseCloudDiscovery/providers/kubernetes *
+recursive-include EnterpriseCloudDiscovery/providers/kubernetes/rules *
