@@ -1,0 +1,22 @@
+DevOps Lab Inc. branding cleanup report
+========================================
+
+Completed:
+- Replaced personal maintainer name and Gmail address in all Dockerfiles.
+- Updated package author to DevOps Lab Inc.
+- Added hello@devopslabinc.com and https://devopslabinc.com to package metadata.
+- Updated report HTML branding and author references to DevOps Lab Inc.
+- Updated ruleset descriptive branding to DevOps Lab Inc.
+- Added a Maintainer section to README.md.
+- Confirmed no Buy Me a Coffee, Ko-fi, Patreon, PayPal.me, donation, sponsor, personal Gmail, Yahoo, or Hotmail references remain.
+
+Validation:
+- Python source compilation: PASS.
+- JSON validation: PASS for 689 production/valid test JSON files.
+- tests/data/invalid-file.json was intentionally excluded because it is a negative test fixture.
+- Metadata and Docker maintainer assertions: PASS.
+- Full pytest suite could not be executed in this isolated environment because required third-party dependencies were unavailable for installation.
+
+Legal attribution:
+- THIRD_PARTY_NOTICES.md retains required upstream Scout Suite / NCC Group attribution under GPLv2.
+- LICENSE remains unchanged.

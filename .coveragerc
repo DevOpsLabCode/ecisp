@@ -1,0 +1,13 @@
+[report]
+include =   EnterpriseCloudDiscovery/*.py
+            EnterpriseCloudDiscovery/core/*.py
+            EnterpriseCloudDiscovery/output/*.py
+            EnterpriseCloudDiscovery/providers/aws/*.py
+            EnterpriseCloudDiscovery/providers/aws/facade/*.py
+            EnterpriseCloudDiscovery/providers/aws/resources/*.py
+            EnterpriseCloudDiscovery/providers/azure/*.py
+            EnterpriseCloudDiscovery/providers/azure/facade/*.py
+            EnterpriseCloudDiscovery/providers/azure/resources/*.py
+            EnterpriseCloudDiscovery/providers/gcp/*.py
+            EnterpriseCloudDiscovery/providers/gcp/facade/*.py
+            EnterpriseCloudDiscovery/providers/gcp/resources/*.py
