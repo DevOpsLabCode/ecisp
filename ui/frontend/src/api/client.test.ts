@@ -102,4 +102,41 @@ describe("api client", () => {
     });
     await expect(api.getScan("abc")).rejects.toThrow("Internal Server Error");
   });
+
+  it("createBatch() POSTs multipart form data without a content-type header", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "batch-1", queued_jobs: 2, skipped_rows: 0 });
+    const file = new File(["provider,auth_method\naws,profile\n"], "accounts.csv", { type: "text/csv" });
+    const result = await api.createBatch(file);
+    expect(result.id).toBe("batch-1");
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain("/api/batches");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toBeUndefined();
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.get("file")).toBe(file);
+  });
+
+  it("createBatch() throws the server detail on failure", async () => {
+    globalThis.fetch = mockFetchOnce({ detail: "Unsupported file type" }, { ok: false, status: 400 });
+    const file = new File(["x"], "accounts.txt");
+    await expect(api.createBatch(file)).rejects.toThrow("Unsupported file type");
+  });
+
+  it("listBatches() calls /api/batches", async () => {
+    globalThis.fetch = mockFetchOnce([{ id: "batch-1" }]);
+    const result = await api.listBatches();
+    expect(result).toEqual([{ id: "batch-1" }]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/batches"), expect.anything());
+  });
+
+  it("getBatch() calls /api/batches/:id", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "batch-1", jobs: [], errors: [] });
+    await api.getBatch("batch-1");
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/batches/batch-1"), expect.anything());
+  });
+
+  it("batchTemplateUrl() returns an absolute URL to the CSV template", () => {
+    expect(api.batchTemplateUrl()).toContain("/api/batches/template.csv");
+  });
 });

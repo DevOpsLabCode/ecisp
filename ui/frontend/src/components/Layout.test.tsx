@@ -16,6 +16,8 @@ describe("Layout", () => {
     expect(screen.getByText("Enterprise Cloud Discovery")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New scan" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Scan history" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Import accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Import history" })).toBeInTheDocument();
     expect(screen.getByText("page content")).toBeInTheDocument();
   });
 
@@ -37,5 +39,23 @@ describe("Layout", () => {
     );
     expect(screen.getByRole("link", { name: "Scan history" })).toHaveClass("active");
     expect(screen.getByRole("link", { name: "New scan" })).not.toHaveClass("active");
+  });
+
+  it("marks the Import accounts link active on /bulk-import", () => {
+    render(
+      <MemoryRouter initialEntries={["/bulk-import"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Import accounts" })).toHaveClass("active");
+  });
+
+  it("marks the Import history link active on /batches", () => {
+    render(
+      <MemoryRouter initialEntries={["/batches"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Import history" })).toHaveClass("active");
   });
 });

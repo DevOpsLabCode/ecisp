@@ -1,12 +1,15 @@
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from . import engine_runner
+from .batch_import import RowParseError, csv_template_text
+from .batches import batch_manager
 from .jobs import REPORT_DIR, manager
 from .providers_meta import list_providers
-from .schemas import JobDetail, JobSummary, ScanCreateRequest
+from .schemas import BatchDetail, BatchSummary, JobDetail, JobSummary, ScanCreateRequest
 
 app = FastAPI(
     title="ecisp-ui",
@@ -83,3 +86,50 @@ def get_scan_results(job_id: str):
         return engine_runner.load_results(job.report_name, REPORT_DIR)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load results: {exc}") from exc
+
+
+# 5MB is generous for a few hundred rows of scan configuration even with
+# every possible column populated; this just guards against unbounded
+# upload abuse, not a realistic import size.
+MAX_BATCH_UPLOAD_BYTES = 5 * 1024 * 1024
+
+
+@app.get("/api/batches/template.csv")
+def batch_template():
+    # Must be registered before /api/batches/{batch_id} -- FastAPI matches
+    # routes in declaration order, and {batch_id} would otherwise swallow
+    # the literal "template.csv" path segment.
+    return PlainTextResponse(
+        csv_template_text(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ecisp-bulk-import-template.csv"},
+    )
+
+
+@app.post("/api/batches", response_model=BatchSummary)
+async def create_batch(file: UploadFile = File(...)):  # noqa: B008 -- required FastAPI pattern, not a real mutable-default bug
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(data) > MAX_BATCH_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds the 5MB limit")
+    try:
+        batch = batch_manager.create_from_file(file.filename or "upload", data)
+    except RowParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not parse {file.filename!r}: {exc}") from exc
+    return batch.summary()
+
+
+@app.get("/api/batches", response_model=list[BatchSummary])
+def list_batches():
+    return [batch.summary() for batch in batch_manager.list()]
+
+
+@app.get("/api/batches/{batch_id}", response_model=BatchDetail)
+def get_batch(batch_id: str):
+    batch = batch_manager.get(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return batch.detail()

@@ -11,6 +11,31 @@ provider scan, launch it, and browse the findings without touching the CLI.
   and a findings browser (severity filters, per-service breakdown, expandable
   finding detail with affected resources).
 
+## Scanning many accounts at once
+
+Two ways, matched to what the engine actually supports natively:
+
+- **Whole organization, one credential** — GCP (`organization_id` +
+  "scan entire organization") and Azure ("scan entire organization") support
+  this directly in the engine; both are scope-field toggles right on the New
+  Scan form. AWS has no equivalent flag in this engine.
+- **Bulk import** (New scan sidebar → Import accounts) — upload a CSV, XLSX,
+  or JSON file where each row is one account's full scan configuration.
+  Rows can mix providers in one file (some AWS rows, some Azure rows, etc.);
+  only the columns relevant to each row's provider are used. Download a
+  filled-in template from the import page. Invalid rows are skipped
+  individually and reported, not treated as a reason to fail the whole
+  import. See `ui/backend/app/batch_import.py`.
+
+  For **AWS** specifically, "one credential, every account in the org" is a
+  standard AWS SDK feature, not something this engine or UI needs to
+  implement: configure per-account profiles in the backend's
+  `~/.aws/config` using cross-account role assumption (`role_arn` +
+  `source_profile`), then list each profile name in its own bulk-import row.
+  boto3 (which the engine uses) resolves that chain automatically — see
+  `EnterpriseCloudDiscovery/providers/aws/authentication_strategy.py`,
+  which just does `boto3.Session(profile_name=profile)`.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —
