@@ -1,4 +1,4 @@
-from app.providers_meta import PROVIDERS, list_providers
+from app.providers_meta import PROVIDERS, all_field_names, auth_field_names, list_providers, scope_field_names
 
 EXPECTED_PROVIDER_CODES = {"aws", "azure", "gcp", "aliyun", "oci", "do", "kubernetes"}
 
@@ -44,3 +44,39 @@ def test_kubernetes_cluster_provider_field_has_select_options():
     cluster_field = next(f for f in fields if f["name"] == "kubernetes_cluster_provider")
     assert cluster_field["type"] == "select"
     assert cluster_field["options"] == ["", "aks", "eks", "gke"]
+
+
+class TestAuthFieldNames:
+    def test_returns_field_names_for_known_provider_and_method(self):
+        assert auth_field_names("aws", "profile") == {"profile"}
+
+    def test_empty_set_for_unknown_provider(self):
+        assert auth_field_names("not-a-provider", "profile") == set()
+
+    def test_empty_set_for_unknown_method(self):
+        assert auth_field_names("aws", "not-a-method") == set()
+
+    def test_empty_set_for_method_with_no_fields(self):
+        assert auth_field_names("azure", "cli") == set()
+
+
+class TestScopeFieldNames:
+    def test_returns_scope_field_names_for_known_provider(self):
+        assert scope_field_names("aws") == {"regions", "excluded_regions"}
+
+    def test_empty_set_for_unknown_provider(self):
+        assert scope_field_names("not-a-provider") == set()
+
+    def test_empty_set_for_provider_with_no_scope_fields(self):
+        assert scope_field_names("aliyun") == set()
+
+
+def test_all_field_names_is_sorted_and_covers_every_provider():
+    names = all_field_names()
+    assert names == sorted(names)
+    assert "profile" in names  # aws/oci
+    assert "tenant_id" in names  # azure
+    assert "organization_id" in names  # gcp
+    assert "access_key_id" in names  # aliyun
+    assert "token" in names  # digitalocean
+    assert "kubernetes_context" in names  # kubernetes
