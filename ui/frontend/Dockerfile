@@ -2,7 +2,7 @@
 #   docker build -t ecisp-frontend --build-arg VITE_API_URL=http://localhost:8000 .
 # Node >=22.22.2 -- see package.json's engines field (jsdom, a dev/test
 # dependency, requires it; kept in sync here so the whole toolchain agrees).
-FROM node:22-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
