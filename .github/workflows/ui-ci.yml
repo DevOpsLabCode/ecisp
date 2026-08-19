@@ -248,10 +248,16 @@ jobs:
           done
           echo "Server did not become healthy in time"; cat /tmp/uvicorn.log; exit 1
 
+      - name: Install k6
+        # grafana/k6-action runs k6 inside its own Docker container, on a
+        # different network namespace than the runner -- it can't reach
+        # the uvicorn process started directly on the runner above.
+        # Installing the k6 binary onto the runner instead shares its
+        # network namespace.
+        uses: grafana/setup-k6-action@v1
+
       - name: k6 smoke/perf test
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: ui/perf/k6-backend-smoke.js
+        run: k6 run ui/perf/k6-backend-smoke.js
         env:
           BASE_URL: http://localhost:8000
 
