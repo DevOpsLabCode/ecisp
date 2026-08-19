@@ -3,6 +3,8 @@
 A web UI for the [Enterprise Cloud Discovery Engine](../README.md): configure a
 provider scan, launch it, and browse the findings without touching the CLI.
 
+> A **DevOps Lab** product. Author: **Stan Zvenigorodskiy**.
+
 - `backend/` — FastAPI service that imports the engine's `run()` function
   directly from this repo and manages a scan job queue.
 - `frontend/` — React + Vite dashboard: provider/auth form, scan history,

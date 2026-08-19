@@ -8,7 +8,12 @@ from .jobs import REPORT_DIR, manager
 from .providers_meta import list_providers
 from .schemas import JobDetail, JobSummary, ScanCreateRequest
 
-app = FastAPI(title="ecisp-ui", version="0.1.0")
+app = FastAPI(
+    title="ecisp-ui",
+    description="Web UI for the Enterprise Cloud Discovery engine, a DevOps Lab product.",
+    version="0.1.0",
+    contact={"name": "Stan Zvenigorodskiy", "url": "https://devopslabinc.com"},
+)
 
 # Defaults cover the Vite dev server (`npm run dev`) and the default
 # docker-compose port for the built frontend. Override with a comma-
