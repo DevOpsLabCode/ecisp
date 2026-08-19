@@ -52,6 +52,35 @@ and then fail cleanly with an explanatory error. This is intentional so the
 UI itself can be developed/tested independent of a full 3.9–3.11 cloud-SDK
 environment.
 
+### Docker
+
+The real way to run this: two images, brought up together.
+
+```bash
+cd ui
+docker compose up --build
+```
+
+- Backend: http://localhost:8000 (full engine installed — this actually
+  builds `EnterpriseCloudDiscovery` and its complete dependency tree, ~2GB
+  image, several minutes on a cold build)
+- Frontend: http://localhost:8080
+
+The backend `Dockerfile` builds from the **repo root** (not `ui/backend`) —
+it needs `EnterpriseCloudDiscovery/` alongside the FastAPI layer, and
+`engine_runner.py` locates the engine via a path relative to its own file,
+so the in-container layout mirrors the repo layout exactly. It's a
+multi-stage build: a `builder` stage with a compiler toolchain (some cloud
+SDK transitive deps don't ship wheels for every platform) produces a venv,
+and the `runtime` stage copies just that venv in, so the final image doesn't
+carry a gcc toolchain.
+
+The frontend bakes `VITE_API_URL` in at build time (Vite env vars aren't
+runtime-configurable) — it must point wherever the backend is reachable
+*from the browser*, not container-to-container. Override with
+`VITE_API_URL=https://your-host:8000 docker compose up --build` if you're
+not using the default port-mapped localhost setup.
+
 ## Testing
 
 Both halves have unit test suites enforced at **95% coverage** in CI (line/statement/function coverage; branch coverage is also gated at 95%, with any genuinely unreachable defensive branches marked `pragma: no cover` / left as documented exceptions rather than papered over with contrived tests).
@@ -96,6 +125,23 @@ Two workflows under `.github/workflows/`, both scoped to `ui/**` so they don't r
   - `perf-backend`: a k6 smoke/latency test (`perf/k6-backend-smoke.js`) against `/api/health` and `/api/providers` — this only exercises the always-available metadata endpoints (CI has no cloud credentials to run a real scan against), asserting p95/p99 latency budgets and a zero error rate. It's a regression guard on the API layer itself, not a substitute for load-testing a real deployment.
   - A final `ci-summary` job fans in every other job so branch protection only needs one required check.
 - **`ui-codeql.yml`** — CodeQL static analysis for both `javascript-typescript` and `python`, on push/PR plus a weekly schedule.
+- **`ui-deploy.yml`** — builds both Docker images, brings the real stack
+  online with `docker compose`, and smoke-tests it before publishing:
+  - health/providers checks against the live backend
+  - a **real scan job** through a bogus AWS profile, asserting the engine
+    actually ran and failed on its own auth check rather than crashing
+    inside our integration (`perf/assert_scan_ran.py`) — this is the only
+    check that exercises the engine's `run()` at all; the metadata
+    endpoints never touch it. It's what caught a real bug during
+    development: the job-queue's background worker thread had no asyncio
+    event loop, which the engine's `run()` needs and Python 3.10+ no
+    longer creates implicitly for non-main threads. Every real scan would
+    have failed in production without this. See `JobManager._run_worker`.
+  - the k6 latency smoke test, against the live containers
+  - only publishes to GHCR (`ghcr.io/<owner>/<repo>-backend` /
+    `-frontend`, tagged with the commit SHA, plus `:latest` on `main`) if
+    every check above passed — pull-request runs build and test but never
+    publish.
 
 ## Notes / follow-ups worth knowing about
 

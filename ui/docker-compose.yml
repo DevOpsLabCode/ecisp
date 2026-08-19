@@ -1,0 +1,36 @@
+# Local/CI stack for ecisp-ui. Run from the repo root or from ui/:
+#   docker compose -f ui/docker-compose.yml up --build
+#
+# Image names/tags are overridable (CI sets these to ghcr.io/... tags so the
+# exact images that get smoke-tested here are the ones that get pushed).
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: ui/backend/Dockerfile
+    image: ${BACKEND_IMAGE:-ecisp-backend:local}
+    ports:
+      - "8000:8000"
+    volumes:
+      - reports:/app/ui/backend/data/reports
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: ${FRONTEND_IMAGE:-ecisp-frontend:local}
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  reports:

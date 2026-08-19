@@ -1,0 +1,167 @@
+name: ui-deploy
+
+# Builds the ecisp-ui backend + frontend as Docker images, brings the real
+# stack online with docker compose, smoke-tests it end to end, and (outside
+# of pull requests) publishes the tested images to GHCR.
+#
+# This intentionally tests-before-publish: images are only pushed if the
+# live stack passed its health/smoke/perf checks in this same run.
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "ui/**"
+      - "EnterpriseCloudDiscovery/**"
+      - "requirements.txt"
+      - "setup.py"
+      - ".github/workflows/ui-deploy.yml"
+  pull_request:
+    paths:
+      - "ui/**"
+      - "EnterpriseCloudDiscovery/**"
+      - "requirements.txt"
+      - "setup.py"
+      - ".github/workflows/ui-deploy.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ui-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-test-publish:
+    name: Build, bring online, test, publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          repo_lc=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          {
+            echo "backend_image=ghcr.io/${repo_lc}-backend:${{ github.sha }}"
+            echo "frontend_image=ghcr.io/${repo_lc}-frontend:${{ github.sha }}"
+            echo "repo_lc=${repo_lc}"
+          } >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        working-directory: ui
+        env:
+          BACKEND_IMAGE: ${{ env.backend_image }}
+          FRONTEND_IMAGE: ${{ env.frontend_image }}
+        run: docker compose build
+
+      - name: Bring the stack online
+        working-directory: ui
+        env:
+          BACKEND_IMAGE: ${{ env.backend_image }}
+          FRONTEND_IMAGE: ${{ env.frontend_image }}
+        run: docker compose up -d
+
+      - name: Wait for backend health
+        run: |
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/health && exit 0
+            sleep 1
+          done
+          echo "backend never became healthy"; exit 1
+
+      - name: Smoke test backend API
+        run: |
+          set -e
+          curl -sf http://localhost:8000/api/health > /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json
+          curl -sf http://localhost:8000/api/providers > /tmp/providers.json
+          count=$(python3 -c "import json; print(len(json.load(open('/tmp/providers.json'))))")
+          test "$count" = "7"
+
+      - name: Smoke test a real scan job through the engine
+        # /api/health and /api/providers never actually call the engine's
+        # run() -- only a real scan job does. It's expected to fail (no
+        # real AWS profile exists in CI), but it must fail on the engine's
+        # own authentication error, not crash on our side of the
+        # integration (e.g. the worker-thread asyncio event-loop bug this
+        # guards against: https://github.com/${{ github.repository }} run
+        # history for the details).
+        run: |
+          set -e
+          job_id=$(curl -sf -X POST http://localhost:8000/api/scans \
+            -H 'content-type: application/json' \
+            -d '{"provider":"aws","auth_method":"profile","auth":{"profile":"ci-smoke-test-nonexistent"},"report_name":"ci-smoke-scan"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          for _ in $(seq 1 30); do
+            status=$(curl -sf "http://localhost:8000/api/scans/$job_id" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+            [ "$status" = "completed" ] || [ "$status" = "failed" ] && break
+            sleep 1
+          done
+          detail=$(curl -sf "http://localhost:8000/api/scans/$job_id")
+          echo "$detail" | python3 -m json.tool
+          echo "$detail" > /tmp/scan_detail.json
+          python3 ui/perf/assert_scan_ran.py /tmp/scan_detail.json
+
+      - name: Smoke test frontend
+        run: |
+          set -e
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8080/ -o /tmp/index.html && break
+            sleep 1
+          done
+          grep -qi "ecisp" /tmp/index.html
+
+      - name: k6 latency smoke test against the live stack
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: ui/perf/k6-backend-smoke.js
+        env:
+          BASE_URL: http://localhost:8000
+
+      - name: Stack logs
+        if: always()
+        working-directory: ui
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        working-directory: ui
+        env:
+          BACKEND_IMAGE: ${{ env.backend_image }}
+          FRONTEND_IMAGE: ${{ env.frontend_image }}
+        run: docker compose down -v
+
+      - name: Log in to GHCR
+        if: success() && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images
+        if: success() && github.event_name != 'pull_request'
+        run: |
+          docker push "${{ env.backend_image }}"
+          docker push "${{ env.frontend_image }}"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            docker tag "${{ env.backend_image }}" "ghcr.io/${{ env.repo_lc }}-backend:latest"
+            docker tag "${{ env.frontend_image }}" "ghcr.io/${{ env.repo_lc }}-frontend:latest"
+            docker push "ghcr.io/${{ env.repo_lc }}-backend:latest"
+            docker push "ghcr.io/${{ env.repo_lc }}-frontend:latest"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ui-deploy"
+            echo "- Backend image: \`${{ env.backend_image }}\`"
+            echo "- Frontend image: \`${{ env.frontend_image }}\`"
+            echo "- Published: $([ '${{ github.event_name }}' != 'pull_request' ] && echo yes || echo 'no (pull_request build, test-only)')"
+          } >> "$GITHUB_STEP_SUMMARY"
