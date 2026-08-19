@@ -69,7 +69,9 @@ PROVIDERS = {
         "scopeFields": [
             {"name": "subscription_ids", "label": "Subscription IDs", "type": FIELD_MULTI,
              "help": "Leave blank to use the default subscription"},
-            {"name": "all_subscriptions", "label": "All accessible subscriptions", "type": FIELD_BOOL},
+            {"name": "all_subscriptions", "label": "Scan entire organization (all accessible subscriptions)",
+             "type": FIELD_BOOL,
+             "help": "One credential, every subscription in the tenant it can see -- no per-account setup needed"},
         ],
     },
     "gcp": {
@@ -85,10 +87,14 @@ PROVIDERS = {
             },
         },
         "scopeFields": [
-            {"name": "project_id", "label": "Project ID", "type": FIELD_TEXT},
+            {"name": "project_id", "label": "Project ID", "type": FIELD_TEXT,
+             "help": "Scan a single project; leave blank when using organization-wide scope below"},
             {"name": "folder_id", "label": "Folder ID", "type": FIELD_TEXT},
-            {"name": "organization_id", "label": "Organization ID", "type": FIELD_TEXT},
-            {"name": "all_projects", "label": "All accessible projects", "type": FIELD_BOOL},
+            {"name": "organization_id", "label": "Organization ID", "type": FIELD_TEXT,
+             "help": "Required together with \"scan entire organization\" below"},
+            {"name": "all_projects", "label": "Scan entire organization (all accessible projects)",
+             "type": FIELD_BOOL,
+             "help": "One credential, every project the organization above it can see -- no per-account setup"},
         ],
     },
     "aliyun": {
@@ -159,3 +165,33 @@ def list_providers():
         {"code": code, "label": meta["label"], "authMethods": meta["authMethods"], "scopeFields": meta["scopeFields"]}
         for code, meta in PROVIDERS.items()
     ]
+
+
+def auth_field_names(provider: str, auth_method: str) -> set[str]:
+    """Field names valid for one provider's one auth method (empty set if either is unknown)."""
+    provider_meta = PROVIDERS.get(provider)
+    if not provider_meta:
+        return set()
+    method_meta = provider_meta["authMethods"].get(auth_method)
+    if not method_meta:
+        return set()
+    return {f["name"] for f in method_meta["fields"]}
+
+
+def scope_field_names(provider: str) -> set[str]:
+    """Scope field names valid for one provider (empty set if the provider is unknown)."""
+    provider_meta = PROVIDERS.get(provider)
+    if not provider_meta:
+        return set()
+    return {f["name"] for f in provider_meta["scopeFields"]}
+
+
+def all_field_names() -> list[str]:
+    """Every auth/scope field name across every provider, sorted -- the union used as bulk-import
+    columns, since one import file's rows can cover different providers with different fields."""
+    names: set[str] = set()
+    for meta in PROVIDERS.values():
+        for method_meta in meta["authMethods"].values():
+            names.update(f["name"] for f in method_meta["fields"])
+        names.update(f["name"] for f in meta["scopeFields"])
+    return sorted(names)

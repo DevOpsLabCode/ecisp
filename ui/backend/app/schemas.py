@@ -33,3 +33,22 @@ class JobSummary(BaseModel):
 class JobDetail(JobSummary):
     request: dict[str, Any]
     log: str
+
+
+class RowError(BaseModel):
+    row_number: int
+    message: str
+
+
+class BatchSummary(BaseModel):
+    id: str
+    filename: str
+    created_at: str
+    queued_jobs: int
+    skipped_rows: int
+    status_counts: dict[str, int]
+
+
+class BatchDetail(BatchSummary):
+    jobs: list[JobSummary]
+    errors: list[RowError]
