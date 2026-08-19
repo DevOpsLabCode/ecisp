@@ -116,10 +116,17 @@ jobs:
           done
           grep -qi "ecisp" /tmp/index.html
 
+      - name: Install k6
+        # grafana/k6-action runs k6 inside its own Docker container, which
+        # is on a different network namespace than the runner -- its
+        # "localhost" isn't the runner's localhost where docker-compose
+        # published our ports. Installing the k6 binary directly onto the
+        # runner instead means it shares the runner's network, matching
+        # local `docker compose up` + `k6 run` usage exactly.
+        uses: grafana/setup-k6-action@v1
+
       - name: k6 latency smoke test against the live stack
-        uses: grafana/k6-action@v0.3.1
-        with:
-          filename: ui/perf/k6-backend-smoke.js
+        run: k6 run ui/perf/k6-backend-smoke.js
         env:
           BASE_URL: http://localhost:8000
 
