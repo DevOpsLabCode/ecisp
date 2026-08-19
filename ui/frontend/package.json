@@ -1,8 +1,11 @@
 {
-  "name": "frontend",
+  "name": "ecisp-ui-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "description": "Web UI for the Enterprise Cloud Discovery engine",
+  "author": "Stan Zvenigorodskiy",
+  "homepage": "https://devopslabinc.com",
   "engines": {
     "node": ">=22.22.2"
   },

@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import Logo from "./Logo";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          ecisp
-          <span className="sub">Enterprise Cloud Discovery</span>
+          <Logo size={30} />
+          <div className="sidebar-brand-text">
+            ecisp
+            <span className="sub">Enterprise Cloud Discovery</span>
+          </div>
         </div>
         <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           New scan
@@ -15,6 +19,12 @@ export default function Layout({ children }: { children: ReactNode }) {
         <NavLink to="/jobs" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Scan history
         </NavLink>
+        <div className="sidebar-footer">
+          <a href="https://devopslabinc.com" target="_blank" rel="noreferrer">
+            A DevOps Lab product
+          </a>
+          <span className="sidebar-footer-author">Built by Stan Zvenigorodskiy</span>
+        </div>
       </aside>
       <main className="main">{children}</main>
     </div>
