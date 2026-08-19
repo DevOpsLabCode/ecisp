@@ -37,6 +37,7 @@ jobs:
   build-test-publish:
     name: Build, bring online, test, publish
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
