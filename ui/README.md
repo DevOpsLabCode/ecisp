@@ -83,6 +83,30 @@ not using the default port-mapped localhost setup.
 
 ## Testing
 
+**Fastest way to check everything:** `ui/scripts/test-all.sh` runs the same
+checks as `ui-ci.yml`, locally, in the same order they'd fail in CI:
+
+```bash
+ui/scripts/test-all.sh            # backend + frontend lint/SAST/tests/build (~1 min)
+ui/scripts/test-all.sh --docker   # + builds the real Docker stack, brings it
+                                   # online, and runs a real scan job through
+                                   # the engine (~5 min, needs Docker)
+```
+
+The `--docker` run is the only one that exercises the engine's `run()` at
+all — everything else (including the plain unit test suites below) stubs
+or never touches it. It's what caught the worker-thread asyncio bug
+mentioned above; don't skip it before anything that touches `jobs.py`,
+`engine_runner.py`, or the Dockerfiles.
+
+Requires `python3.11` (`brew install python@3.11` if you don't have it —
+newer Python versions can't build `pydantic-core` from source since PyO3
+doesn't support them yet) and Node ≥22.22.2 for the frontend half; `--docker`
+additionally needs Docker running (Docker Desktop, or `colima start` on
+macOS without it).
+
+### Manually, piece by piece
+
 Both halves have unit test suites enforced at **95% coverage** in CI (line/statement/function coverage; branch coverage is also gated at 95%, with any genuinely unreachable defensive branches marked `pragma: no cover` / left as documented exceptions rather than papered over with contrived tests).
 
 ```bash
@@ -142,6 +166,26 @@ Two workflows under `.github/workflows/`, both scoped to `ui/**` so they don't r
     `-frontend`, tagged with the commit SHA, plus `:latest` on `main`) if
     every check above passed — pull-request runs build and test but never
     publish.
+
+### Verifying the pipeline itself
+
+If you change a workflow file, don't just eyeball it -- YAML that parses
+is not YAML that runs:
+
+```bash
+brew install actionlint    # validates syntax AND checks that pinned action
+                            # tags/inputs actually exist and resolve
+actionlint .github/workflows/*.yml
+```
+
+That last part matters: `actionlint` is what would have caught
+`aquasecurity/trivy-action@0.29.0` (missing the `v` real tags use) before
+it ever reached CI. After pushing, watch it run rather than assuming green:
+
+```bash
+gh pr checks <PR#>              # one-line pass/fail per check
+gh run watch <run-id> --exit-status   # live tail of a specific run
+```
 
 ## Notes / follow-ups worth knowing about
 
