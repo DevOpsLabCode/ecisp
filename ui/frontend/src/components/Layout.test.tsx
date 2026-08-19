@@ -1,0 +1,41 @@
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
+import Layout from "./Layout";
+
+describe("Layout", () => {
+  it("renders the brand, nav links, and children", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Layout>
+          <p>page content</p>
+        </Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("ecisp")).toBeInTheDocument();
+    expect(screen.getByText("Enterprise Cloud Discovery")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New scan" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Scan history" })).toBeInTheDocument();
+    expect(screen.getByText("page content")).toBeInTheDocument();
+  });
+
+  it("marks the New scan link active on the root route", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "New scan" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Scan history" })).not.toHaveClass("active");
+  });
+
+  it("marks the Scan history link active on /jobs", () => {
+    render(
+      <MemoryRouter initialEntries={["/jobs"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Scan history" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "New scan" })).not.toHaveClass("active");
+  });
+});

@@ -1,0 +1,6 @@
+# The FastAPI web layer only. No engine, no test tooling -- this is what
+# the production Docker image installs on top of the engine's own
+# requirements.txt.
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3

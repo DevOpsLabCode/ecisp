@@ -1,0 +1,311 @@
+name: ui-ci
+
+# CI for the ui/ subproject (FastAPI backend + React frontend) that wraps
+# the Enterprise Cloud Discovery engine. Scoped to ui/** so it doesn't run
+# on changes to the engine itself.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/**"
+      - ".github/workflows/ui-ci.yml"
+  pull_request:
+    paths:
+      - "ui/**"
+      - ".github/workflows/ui-ci.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ui-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default; jobs that need more (dependency-scan's SARIF
+# upload) declare it themselves.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  # jsdom 30.x (frontend test dependency) requires Node >=22.22.2 -- see
+  # ui/frontend/package.json's engines field.
+  NODE_VERSION: "22"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Backend: unit tests + coverage gate
+  # ---------------------------------------------------------------------
+  backend-test:
+    name: Backend / tests + coverage (>=95%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ui/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: ui/backend/requirements-test.txt
+
+      - name: Install test dependencies
+        # Deliberately does NOT install the real engine (requirements.txt /
+        # -e ../..) -- the suite stubs EnterpriseCloudDiscovery via
+        # tests/conftest.py so this stays fast and independent of the heavy
+        # cloud SDK dependency tree. See ui/README.md.
+        run: pip install -r requirements-test.txt
+
+      - name: Run pytest with coverage gate
+        run: pytest
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## Backend coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: |
+            ui/backend/htmlcov/
+            ui/backend/coverage.xml
+          retention-days: 14
+
+  backend-lint:
+    name: Backend / lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ui/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff==0.8.4
+      - run: ruff check .
+
+  backend-sast:
+    name: Backend / SAST (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ui/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install "bandit[toml]==1.8.0"
+      - run: bandit -r app -c pyproject.toml
+
+  # ---------------------------------------------------------------------
+  # Frontend: unit tests + coverage gate
+  # ---------------------------------------------------------------------
+  frontend-test:
+    name: Frontend / tests + coverage (>=95%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ui/frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run test:coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: ui/frontend/coverage/
+          retention-days: 14
+
+  frontend-lint:
+    name: Frontend / lint + typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ui/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc -b --noEmit
+
+  frontend-build:
+    name: Frontend / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ui/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ui/frontend/dist/
+          retention-days: 14
+
+  # ---------------------------------------------------------------------
+  # Dependency scanning (both ecosystems) + secret scanning
+  # ---------------------------------------------------------------------
+  dependency-scan:
+    name: Dependency + secret scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ui/
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "1"
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ---------------------------------------------------------------------
+  # Performance scanning
+  # ---------------------------------------------------------------------
+  perf-frontend:
+    name: Performance / Lighthouse (frontend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: frontend-build
+    defaults:
+      run:
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ui/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+      - name: Lighthouse CI
+        # Note: `defaults.run.working-directory` above only applies to shell
+        # `run:` steps, not `uses:` action steps -- this one runs from the
+        # repo root, so paths (including collect.staticDistDir inside
+        # lighthouserc.json) are repo-root-relative.
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ui/frontend/lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+  perf-backend:
+    name: Performance / k6 smoke (backend API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ui/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: ui/backend/requirements-test.txt
+      - run: pip install -r requirements-test.txt
+
+      - name: Start API server
+        run: |
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+          for _ in $(seq 1 20); do
+            curl -sf http://localhost:8000/api/health && exit 0
+            sleep 0.5
+          done
+          echo "Server did not become healthy in time"; cat /tmp/uvicorn.log; exit 1
+
+      - name: Install k6
+        # grafana/k6-action runs k6 inside its own Docker container, on a
+        # different network namespace than the runner -- it can't reach
+        # the uvicorn process started directly on the runner above.
+        # Installing the k6 binary onto the runner instead shares its
+        # network namespace.
+        uses: grafana/setup-k6-action@v1
+
+      - name: k6 smoke/perf test
+        # This job's working-directory default is ui/backend (above), so
+        # the path here is relative to that, not the repo root.
+        run: k6 run ../perf/k6-backend-smoke.js
+        env:
+          BASE_URL: http://localhost:8000
+
+      - name: Server log
+        if: always()
+        run: cat /tmp/uvicorn.log || true
+
+  # ---------------------------------------------------------------------
+  # Single required check for branch protection
+  # ---------------------------------------------------------------------
+  ci-summary:
+    name: ui-ci summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: always()
+    needs:
+      - backend-test
+      - backend-lint
+      - backend-sast
+      - frontend-test
+      - frontend-lint
+      - frontend-build
+      - dependency-scan
+      - perf-frontend
+      - perf-backend
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more ui-ci jobs failed."
+            exit 1
+          fi
+          echo "All ui-ci jobs passed."

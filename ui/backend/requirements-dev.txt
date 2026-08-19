@@ -1,0 +1,5 @@
+-r requirements-test.txt
+
+ruff==0.8.4
+bandit[toml]==1.8.0
+pip-audit==2.7.3
