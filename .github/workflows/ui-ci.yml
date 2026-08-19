@@ -20,9 +20,16 @@ concurrency:
   group: ui-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default; jobs that need more (dependency-scan's SARIF
+# upload) declare it themselves.
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: "3.11"
-  NODE_VERSION: "20"
+  # jsdom 30.x (frontend test dependency) requires Node >=22.22.2 -- see
+  # ui/frontend/package.json's engines field.
+  NODE_VERSION: "22"
 
 jobs:
   # ---------------------------------------------------------------------
@@ -31,6 +38,7 @@ jobs:
   backend-test:
     name: Backend / tests + coverage (>=95%)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ui/backend
@@ -73,6 +81,7 @@ jobs:
   backend-lint:
     name: Backend / lint (ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: ui/backend
@@ -87,6 +96,7 @@ jobs:
   backend-sast:
     name: Backend / SAST (bandit)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: ui/backend
@@ -104,6 +114,7 @@ jobs:
   frontend-test:
     name: Frontend / tests + coverage (>=95%)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ui/frontend
@@ -128,6 +139,7 @@ jobs:
   frontend-lint:
     name: Frontend / lint + typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: ui/frontend
@@ -145,6 +157,7 @@ jobs:
   frontend-build:
     name: Frontend / build
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: ui/frontend
@@ -170,6 +183,7 @@ jobs:
   dependency-scan:
     name: Dependency + secret scan (Trivy)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       security-events: write
@@ -177,7 +191,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: ui/
@@ -199,6 +213,7 @@ jobs:
   perf-frontend:
     name: Performance / Lighthouse (frontend)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: frontend-build
     defaults:
       run:
@@ -227,6 +242,7 @@ jobs:
   perf-backend:
     name: Performance / k6 smoke (backend API)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ui/backend
@@ -257,7 +273,9 @@ jobs:
         uses: grafana/setup-k6-action@v1
 
       - name: k6 smoke/perf test
-        run: k6 run ui/perf/k6-backend-smoke.js
+        # This job's working-directory default is ui/backend (above), so
+        # the path here is relative to that, not the repo root.
+        run: k6 run ../perf/k6-backend-smoke.js
         env:
           BASE_URL: http://localhost:8000
 
@@ -271,6 +289,7 @@ jobs:
   ci-summary:
     name: ui-ci summary
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     if: always()
     needs:
       - backend-test
