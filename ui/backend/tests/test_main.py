@@ -207,3 +207,92 @@ def test_get_scan_results_500_when_encoder_raises(monkeypatch):
     res = client.get(f"/api/scans/{job_id}/results")
     assert res.status_code == 500
     assert "Failed to load results" in res.json()["detail"]
+
+
+def wait_for_batch_status(batch_id: str, timeout: float = 5.0) -> dict:
+    deadline = time.time() + timeout
+    detail = {}
+    while time.time() < deadline:
+        detail = client.get(f"/api/batches/{batch_id}").json()
+        counts = detail["status_counts"]
+        if counts["queued"] == 0 and counts["running"] == 0 and detail["queued_jobs"] > 0:
+            return detail
+        if detail["queued_jobs"] == 0:
+            return detail
+        time.sleep(0.02)
+    raise AssertionError(f"batch {batch_id} jobs never reached a terminal status: {detail}")
+
+
+def test_batch_template_download():
+    res = client.get("/api/batches/template.csv")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    assert "attachment" in res.headers["content-disposition"]
+    assert res.text.splitlines()[0].startswith("provider,auth_method")
+
+
+def test_create_batch_rejects_empty_file():
+    res = client.post("/api/batches", files={"file": ("accounts.csv", b"", "text/csv")})
+    assert res.status_code == 400
+
+
+def test_create_batch_rejects_corrupted_xlsx():
+    # Real-world scenario: a user uploads a file that merely has an .xlsx
+    # extension but isn't valid XLSX (renamed, truncated, wrong export).
+    # openpyxl raises on load, well before our own RowParseError -- the
+    # generic except-Exception path in create_batch must still turn this
+    # into a clean 400, not a 500.
+    res = client.post(
+        "/api/batches", files={"file": ("accounts.xlsx", b"not actually an xlsx file", "application/octet-stream")}
+    )
+    assert res.status_code == 400
+    assert "Could not parse" in res.json()["detail"]
+
+
+def test_create_batch_rejects_unsupported_extension():
+    res = client.post("/api/batches", files={"file": ("accounts.txt", b"provider,auth_method\n", "text/plain")})
+    assert res.status_code == 400
+    assert "Unsupported file type" in res.json()["detail"]
+
+
+def test_create_batch_rejects_file_over_size_limit(monkeypatch):
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "MAX_BATCH_UPLOAD_BYTES", 10)
+    data = b"provider,auth_method\naws,profile\n"
+    res = client.post("/api/batches", files={"file": ("accounts.csv", data, "text/csv")})
+    assert res.status_code == 413
+
+
+def test_create_and_fetch_batch(monkeypatch):
+    monkeypatch.setattr(engine_runner, "ENGINE_AVAILABLE", True)
+    monkeypatch.setattr(engine_runner, "engine_run", lambda **kwargs: 0)
+
+    csv_data = (
+        b"provider,auth_method,report_name,profile\n"
+        b"aws,profile,api-batch-1,audit-1\n"
+        b"aws,profile,api-batch-2,audit-2\n"
+        b"bogus,profile,api-batch-bad,x\n"
+    )
+    res = client.post("/api/batches", files={"file": ("accounts.csv", csv_data, "text/csv")})
+    assert res.status_code == 200
+    summary = res.json()
+    assert summary["queued_jobs"] == 2
+    assert summary["skipped_rows"] == 1
+
+    detail = wait_for_batch_status(summary["id"])
+    assert len(detail["jobs"]) == 2
+    assert len(detail["errors"]) == 1
+    assert detail["status_counts"]["completed"] == 2
+
+
+def test_list_batches_includes_created_batch():
+    res = client.post("/api/batches", files={"file": ("list-test.csv", b"provider,auth_method\n", "text/csv")})
+    batch_id = res.json()["id"]
+    listed = client.get("/api/batches").json()
+    assert any(b["id"] == batch_id for b in listed)
+
+
+def test_get_batch_404_for_unknown_id():
+    res = client.get("/api/batches/does-not-exist")
+    assert res.status_code == 404

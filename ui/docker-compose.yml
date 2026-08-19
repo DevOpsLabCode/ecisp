@@ -18,6 +18,11 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
     volumes:
       - reports:/app/ui/backend/data/reports
+      # Uncomment to enable "profile" auth (including cross-account role
+      # assumption for scanning many AWS accounts with one credential --
+      # see ui/README.md#scanning-many-accounts-at-once). Mount read-only;
+      # the container never needs to write to it.
+      # - ${HOME}/.aws:/home/appuser/.aws:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 5s

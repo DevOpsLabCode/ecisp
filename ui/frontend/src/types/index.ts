@@ -87,3 +87,22 @@ export interface ScanResults {
   services?: Record<string, ServiceData>;
   [key: string]: unknown;
 }
+
+export interface BatchSummary {
+  id: string;
+  filename: string;
+  created_at: string;
+  queued_jobs: number;
+  skipped_rows: number;
+  status_counts: Record<JobStatus, number>;
+}
+
+export interface RowError {
+  row_number: number;
+  message: string;
+}
+
+export interface BatchDetail extends BatchSummary {
+  jobs: JobSummary[];
+  errors: RowError[];
+}
