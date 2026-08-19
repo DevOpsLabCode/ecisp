@@ -8,6 +8,7 @@ asyncio event loop per run, neither of which is safe to do concurrently
 from multiple threads. A single-worker queue sidesteps that entirely and
 matches how this tool is actually used -- one audit run at a time.
 """
+import asyncio
 import queue
 import threading
 import uuid
@@ -107,6 +108,12 @@ class JobManager:
             return [self._jobs[jid] for jid in self._order]
 
     def _run_worker(self):
+        # Python 3.10+ no longer implicitly creates an event loop for
+        # non-main threads, but the engine's run() calls
+        # asyncio.get_event_loop() internally and expects one to already
+        # exist. Without this, every real scan fails immediately with
+        # "There is no current event loop in thread ...".
+        asyncio.set_event_loop(asyncio.new_event_loop())
         while True:
             job_id = self._queue.get()
             job = self._jobs.get(job_id)

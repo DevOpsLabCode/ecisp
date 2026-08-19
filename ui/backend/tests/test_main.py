@@ -85,7 +85,11 @@ def test_list_scans_includes_created_job():
         },
     )
     job_id = create_res.json()["id"]
-    wait_for_status(job_id)
+    detail = wait_for_status(job_id)
+    # Regression check: this doesn't monkeypatch engine_run, so it goes
+    # through the default stub, which calls asyncio.get_event_loop() just
+    # like the real engine -- see JobManager._run_worker.
+    assert detail["status"] == "completed", detail["error"]
 
     listed = client.get("/api/scans").json()
     assert any(j["id"] == job_id for j in listed)

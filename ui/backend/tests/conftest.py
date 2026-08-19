@@ -9,8 +9,22 @@ modules, and Python's import system checks sys.modules before touching the
 filesystem/sys.path, so these fakes win even though the real
 EnterpriseCloudDiscovery package also exists two directories up.
 """
+import asyncio
 import sys
 import types
+
+
+def _stub_run(**kwargs):
+    # Mirrors the real engine's __main__.run(): it calls
+    # asyncio.get_event_loop() directly and expects the calling thread to
+    # already have one. Python 3.10+ raises RuntimeError instead of
+    # implicitly creating one for non-main threads, which is exactly the
+    # bug this stub exists to catch -- see JobManager._run_worker.
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+    loop.close()
+    return 0
 
 
 def _install_stub_engine() -> None:
@@ -21,7 +35,7 @@ def _install_stub_engine() -> None:
     package.__path__ = []  # mark as a package
 
     main_module = types.ModuleType("EnterpriseCloudDiscovery.__main__")
-    main_module.run = lambda **kwargs: 0  # overridden per-test via monkeypatch
+    main_module.run = _stub_run  # overridden per-test via monkeypatch
 
     output_package = types.ModuleType("EnterpriseCloudDiscovery.output")
     output_package.__path__ = []

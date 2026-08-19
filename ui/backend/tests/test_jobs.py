@@ -67,12 +67,18 @@ class TestJobLifecycle:
         assert job.status in ("queued", "running", "completed", "failed")
         assert job.id
         wait_for_terminal_status(job)
+        # Regression check: the default (non-monkeypatched) stub run() calls
+        # asyncio.get_event_loop() exactly like the real engine does, so a
+        # successful outcome here proves the worker thread has a usable
+        # event loop. See JobManager._run_worker.
+        assert job.status == "completed", job.error
 
     def test_report_name_is_generated_when_absent(self):
         req = make_req(report_name=None)
         job = manager.create(req)
         assert job.report_name.startswith("aws-")
         wait_for_terminal_status(job)
+        assert job.status == "completed", job.error
 
     def test_successful_run_marks_job_completed(self, monkeypatch):
         monkeypatch.setattr(engine_runner, "ENGINE_AVAILABLE", True)
@@ -132,6 +138,7 @@ class TestManagerQueries:
         job = manager.create(req)
         assert manager.get(job.id) is job
         wait_for_terminal_status(job)
+        assert job.status == "completed", job.error
 
     def test_list_includes_newly_created_job_first(self):
         req = make_req(report_name="query-list-test")
@@ -139,13 +146,16 @@ class TestManagerQueries:
         listed = manager.list()
         assert listed[0].id == job.id
         wait_for_terminal_status(job)
+        assert job.status == "completed", job.error
 
 
 def test_new_manager_instance_starts_its_own_worker():
     # Sanity check that JobManager isn't hard-wired to the module singleton;
-    # a fresh instance should be independently usable.
+    # a fresh instance should be independently usable. Also exercises the
+    # asyncio event-loop regression check (see test_create_returns_queued_
+    # job_with_expected_fields) on a brand-new worker thread.
     fresh = JobManager()
     req = make_req(report_name="fresh-manager-test")
     job = fresh.create(req)
     wait_for_terminal_status(job)
-    assert job.status in ("completed", "failed")
+    assert job.status == "completed", job.error
