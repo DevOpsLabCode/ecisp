@@ -1,0 +1,39 @@
+version: 2
+updates:
+  # GitHub Actions used by ui-ci.yml / ui-deploy.yml / ui-codeql.yml. Kept
+  # up to date automatically so a pinned tag doesn't quietly rot -- this is
+  # exactly the class of mistake that broke dependency-scan (an
+  # unpublished aquasecurity/trivy-action tag).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/ui/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: "pip"
+    directory: "/ui/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directory: "/ui/backend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/ui/frontend"
+    schedule:
+      interval: "weekly"
