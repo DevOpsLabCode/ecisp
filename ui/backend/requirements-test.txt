@@ -1,0 +1,10 @@
+# Minimal set needed to run the unit test suite. Deliberately does NOT
+# include the engine itself (requirements.txt / -e ../..) -- tests stub out
+# EnterpriseCloudDiscovery via tests/conftest.py so the suite is fast and
+# doesn't depend on the heavy cloud SDK dependency tree being installed.
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1
