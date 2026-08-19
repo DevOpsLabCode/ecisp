@@ -87,13 +87,26 @@ pre {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Pin to the viewport instead of stretching to match .main's content
+     height, so .sidebar-footer's margin-top:auto lands at the bottom of
+     the screen rather than the bottom of a long scrolled page. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.sidebar-brand-text {
   font-weight: 700;
   font-size: 15px;
-  margin-bottom: 20px;
   color: var(--text);
+  line-height: 1.2;
 }
 .sidebar-brand .sub {
   display: block;
@@ -101,6 +114,27 @@ pre {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+.sidebar-footer a {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.sidebar-footer a:hover {
+  color: var(--accent);
+}
+.sidebar-footer-author {
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 
 .nav-link {
