@@ -3,9 +3,38 @@ import time
 from fastapi.testclient import TestClient
 
 from app import engine_runner
-from app.main import app
+from app.main import app, parse_cors_origins
 
 client = TestClient(app)
+
+
+def test_parse_cors_origins_splits_and_trims():
+    assert parse_cors_origins("http://a.example, http://b.example ,http://c.example") == [
+        "http://a.example",
+        "http://b.example",
+        "http://c.example",
+    ]
+
+
+def test_parse_cors_origins_drops_empty_entries():
+    assert parse_cors_origins("http://a.example,,  ,http://b.example") == [
+        "http://a.example",
+        "http://b.example",
+    ]
+
+
+def test_parse_cors_origins_empty_string_yields_no_origins():
+    assert parse_cors_origins("") == []
+
+
+def test_cors_headers_present_for_configured_dev_origin():
+    res = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
+    assert res.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_cors_headers_absent_for_unconfigured_origin():
+    res = client.get("/api/health", headers={"Origin": "http://evil.example"})
+    assert "access-control-allow-origin" not in res.headers
 
 
 def wait_for_status(job_id: str, timeout: float = 5.0) -> dict:

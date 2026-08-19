@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,9 +10,22 @@ from .schemas import JobDetail, JobSummary, ScanCreateRequest
 
 app = FastAPI(title="ecisp-ui", version="0.1.0")
 
+# Defaults cover the Vite dev server (`npm run dev`) and the default
+# docker-compose port for the built frontend. Override with a comma-
+# separated CORS_ORIGINS env var for any other deployment -- the frontend
+# origin the browser actually uses must be listed exactly (scheme + host +
+# port), or every request will fail CORS preflight with no server-side
+# error to point at, same as it did before this was configurable.
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080"
+
+
+def parse_cors_origins(raw: str) -> list[str]:
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=parse_cors_origins(os.environ.get("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)),
     allow_methods=["*"],
     allow_headers=["*"],
 )

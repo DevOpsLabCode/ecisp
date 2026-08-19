@@ -11,6 +11,11 @@ services:
     image: ${BACKEND_IMAGE:-ecisp-backend:local}
     ports:
       - "8000:8000"
+    environment:
+      # Must match wherever the browser actually loads the frontend from --
+      # see app/main.py. Defaults already cover this compose file's own
+      # frontend port (8080); override if you republish it elsewhere.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
     volumes:
       - reports:/app/ui/backend/data/reports
     healthcheck:
