@@ -154,6 +154,41 @@ jobs:
           print('report.sarif downloaded and parses as valid SARIF')
           "
 
+      - name: Smoke test a real registry scan through the pipeline
+        # Exercises the container-image scan pipeline end to end against the
+        # live container -- a real anonymous pull + `trivy image` run against
+        # a real public image (alpine:3.18, kept small so this stays fast;
+        # the vulnerability DB is already warm from the code-scan smoke test
+        # above, both running inside the same backend container this job).
+        run: |
+          set -e
+          scan_id=$(curl -sf -X POST http://localhost:8000/api/registry-scans \
+            -H 'content-type: application/json' \
+            -d '{"image_ref":"alpine:3.18"}' \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          for _ in $(seq 1 60); do
+            status=$(curl -sf "http://localhost:8000/api/registry-scans/$scan_id" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+            [ "$status" = "completed" ] || [ "$status" = "failed" ] && break
+            sleep 1
+          done
+          detail=$(curl -sf "http://localhost:8000/api/registry-scans/$scan_id")
+          echo "$detail" | python3 -m json.tool
+          echo "$detail" > /tmp/registry_scan_detail.json
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/registry_scan_detail.json'))
+          assert d['status'] == 'completed', f\"expected completed, got {d['status']!r}: {d.get('error')}\"
+          assert d['image_ref'] == 'alpine:3.18'
+          print('registry scan smoke test passed:', d['finding_count'], 'findings')
+          "
+          curl -sf "http://localhost:8000/api/registry-scans/$scan_id/report.sarif" -o /tmp/registry_scan_report.sarif
+          python3 -c "
+          import json
+          report = json.load(open('/tmp/registry_scan_report.sarif'))
+          assert report['runs'], 'SARIF report has no runs'
+          print('report.sarif downloaded and parses as valid SARIF')
+          "
+
       - name: Smoke test frontend
         run: |
           set -e
