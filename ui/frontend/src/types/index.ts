@@ -247,3 +247,21 @@ export interface RegistryScanDetail extends RegistryScanSummary {
   scanners_run: string[];
   findings: CodeScanFinding[];
 }
+
+export interface RuntimeClusterCreateRequest {
+  name: string;
+}
+
+export interface RuntimeClusterSummary {
+  id: string;
+  name: string;
+  created_at: string;
+  last_event_at: string | null;
+  severity_counts: Record<Severity, number>;
+  finding_count: number;
+}
+
+export interface RuntimeClusterDetail extends RuntimeClusterSummary {
+  install_token: string;
+  findings: CodeScanFinding[];
+}
