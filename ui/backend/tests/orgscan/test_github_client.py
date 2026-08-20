@@ -3,18 +3,22 @@ import subprocess
 import httpx
 import pytest
 
-from app.orgscan.github_client import GitHubAuthError, GitHubClient
+from app.orgscan.github_client import GitHubAuthError, GitHubClient, commit_sha, parse_repo_url
 
 
 def _client(handler) -> GitHubClient:
     return GitHubClient("fake-token", transport=httpx.MockTransport(handler))
 
 
-def test_rejects_empty_token():
-    with pytest.raises(GitHubAuthError):
-        GitHubClient("")
-    with pytest.raises(GitHubAuthError):
-        GitHubClient("   ")
+def test_empty_or_none_token_creates_an_anonymous_client():
+    # Anonymous access is intentional -- use case 1's public-repo flow
+    # scans without any token at all. verify() is the operation that
+    # actually needs one; the constructor itself never did.
+    for token in ("", "   ", None):
+        client = GitHubClient(token)
+        assert client._token is None
+        with pytest.raises(GitHubAuthError, match="No token to verify"):
+            client.verify()
 
 
 def test_verify_returns_user_on_success():
@@ -183,3 +187,96 @@ def test_clone_redacts_token_from_error_message(monkeypatch):
             pass
     assert "fake-token-xyz" not in str(exc_info.value)
     assert "<redacted>" in str(exc_info.value)
+
+
+def test_clone_anonymous_uses_a_plain_url_and_does_not_crash_on_failure(monkeypatch):
+    captured = {}
+
+    def fake_run(args, capture_output, text, timeout, check):
+        captured["args"] = args
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="fatal: repository not found")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with GitHubClient(None) as gh:
+        with pytest.raises(RuntimeError, match="repository not found"):
+            with gh.clone("org", "repo"):
+                pass
+    # the URL is the second-to-last positional arg (dest is last)
+    assert captured["args"][-2] == "https://github.com/org/repo.git"
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://github.com/octocat/Hello-World", ("octocat", "Hello-World")),
+        ("https://github.com/octocat/Hello-World.git", ("octocat", "Hello-World")),
+        ("https://github.com/octocat/Hello-World/", ("octocat", "Hello-World")),
+        ("http://github.com/octocat/Hello-World", ("octocat", "Hello-World")),
+        ("github.com/octocat/Hello-World", ("octocat", "Hello-World")),
+        ("https://www.github.com/octocat/Hello-World", ("octocat", "Hello-World")),
+        ("https://github.com/octocat/Hello-World/tree/main", ("octocat", "Hello-World")),
+        ("https://github.com/octocat/Hello-World/blob/main/README.md", ("octocat", "Hello-World")),
+        ("git@github.com:octocat/Hello-World.git", ("octocat", "Hello-World")),
+    ],
+)
+def test_parse_repo_url_handles_common_shapes(url, expected):
+    assert parse_repo_url(url) == expected
+
+
+def test_parse_repo_url_rejects_non_github_url():
+    with pytest.raises(ValueError, match="Not a recognizable"):
+        parse_repo_url("https://gitlab.com/octocat/Hello-World")
+
+
+def test_get_repo_returns_metadata():
+    def handler(request):
+        return httpx.Response(
+            200, json={"full_name": "octocat/Hello-World", "private": False, "default_branch": "main"}
+        )
+
+    with _client(handler) as gh:
+        info = gh.get_repo("octocat", "Hello-World")
+    assert info["private"] is False
+    assert info["default_branch"] == "main"
+
+
+def test_get_repo_404_raises_auth_error():
+    def handler(request):
+        return httpx.Response(404, json={"message": "Not Found"})
+
+    with _client(handler) as gh, pytest.raises(GitHubAuthError, match="not found"):
+        gh.get_repo("octocat", "private-repo")
+
+
+def test_list_branches_paginates():
+    def handler(request):
+        if "page2" not in str(request.url):
+            return httpx.Response(
+                200,
+                json=[{"name": "main"}],
+                headers={"Link": '<https://api.github.com/repos/o/r/branches?page2=1>; rel="next"'},
+            )
+        return httpx.Response(200, json=[{"name": "develop"}])
+
+    with _client(handler) as gh:
+        branches = gh.list_branches("o", "r")
+    assert branches == ["main", "develop"]
+
+
+def test_commit_sha_reads_head(tmp_path, monkeypatch):
+    def fake_run(args, cwd, capture_output, text, timeout, check):
+        assert args == ["git", "rev-parse", "HEAD"]
+        return subprocess.CompletedProcess(args, 0, stdout="abc123\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert commit_sha(tmp_path) == "abc123"
+
+
+def test_commit_sha_raises_on_failure(tmp_path, monkeypatch):
+    def fake_run(args, cwd, capture_output, text, timeout, check):
+        return subprocess.CompletedProcess(args, 128, stdout="", stderr="fatal: not a git repository")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="git rev-parse HEAD failed"):
+        commit_sha(tmp_path)
