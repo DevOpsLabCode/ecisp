@@ -196,7 +196,7 @@ jobs:
             curl -sf http://localhost:8080/ -o /tmp/index.html && break
             sleep 1
           done
-          grep -qi "ecisp" /tmp/index.html
+          grep -qi "golem" /tmp/index.html
 
       - name: Install k6
         # grafana/k6-action runs k6 inside its own Docker container, which
