@@ -37,7 +37,7 @@ export default function NewRegistryScan() {
   return (
     <>
       <div className="page-header">
-        <h1>New registry scan</h1>
+        <h1>New Artifact Registry Scan</h1>
         <p>
           Scan one container image for known vulnerabilities and baked-in secrets — pull it straight
           from JFrog Artifactory, Docker Hub, GitHub Container Registry, AWS ECR, Google Artifact

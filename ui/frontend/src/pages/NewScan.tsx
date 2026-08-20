@@ -92,7 +92,7 @@ export default function NewScan() {
     return (
       <>
         <div className="page-header">
-          <h1>New scan</h1>
+          <h1>New CSPM Scan</h1>
         </div>
         <div className="banner error">Could not reach the backend at the configured API URL: {loadError}</div>
       </>
@@ -102,7 +102,7 @@ export default function NewScan() {
   return (
     <>
       <div className="page-header">
-        <h1>New scan</h1>
+        <h1>New CSPM Scan</h1>
         <p>Configure a provider, authenticate, and launch a discovery + rule-evaluation run.</p>
       </div>
 

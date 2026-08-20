@@ -30,7 +30,7 @@ export default function OrgScans() {
   return (
     <>
       <div className="page-header">
-        <h1>Org security scans</h1>
+        <h1>GitHub Org Scan History</h1>
         <p>Every GitHub org/account scan, most recent first.</p>
       </div>
 

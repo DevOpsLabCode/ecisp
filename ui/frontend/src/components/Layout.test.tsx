@@ -12,22 +12,22 @@ describe("Layout", () => {
         </Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByText("ecisp")).toBeInTheDocument();
-    expect(screen.getByText("Enterprise Cloud Discovery")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New scan" })).toBeInTheDocument();
+    expect(screen.getByText("Golem")).toBeInTheDocument();
+    expect(screen.getByText("Built to defend what you build")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New CSPM Scan" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Scan history" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Import accounts" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Import history" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Import Cloud Accounts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cloud Import History" })).toBeInTheDocument();
     expect(screen.getByText("page content")).toBeInTheDocument();
   });
 
-  it("marks the New scan link active on the root route", () => {
+  it("marks the New CSPM Scan link active on the root route", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "New scan" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "New CSPM Scan" })).toHaveClass("active");
     expect(screen.getByRole("link", { name: "Scan history" })).not.toHaveClass("active");
   });
 
@@ -38,25 +38,25 @@ describe("Layout", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("link", { name: "Scan history" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "New scan" })).not.toHaveClass("active");
+    expect(screen.getByRole("link", { name: "New CSPM Scan" })).not.toHaveClass("active");
   });
 
-  it("marks the Import accounts link active on /bulk-import", () => {
+  it("marks the Import Cloud Accounts link active on /bulk-import", () => {
     render(
       <MemoryRouter initialEntries={["/bulk-import"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Import accounts" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Import Cloud Accounts" })).toHaveClass("active");
   });
 
-  it("marks the Import history link active on /batches", () => {
+  it("marks the Cloud Import History link active on /batches", () => {
     render(
       <MemoryRouter initialEntries={["/batches"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Import history" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Cloud Import History" })).toHaveClass("active");
   });
 
   it("renders the org security nav links", () => {
@@ -65,27 +65,27 @@ describe("Layout", () => {
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "New org scan" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Org scan history" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Scan GitHub Organization" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub Org Scan History" })).toBeInTheDocument();
   });
 
-  it("marks the New org scan link active on /org-scans/new", () => {
+  it("marks the Scan GitHub Organization link active on /org-scans/new", () => {
     render(
       <MemoryRouter initialEntries={["/org-scans/new"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "New org scan" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "Org scan history" })).not.toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Scan GitHub Organization" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "GitHub Org Scan History" })).not.toHaveClass("active");
   });
 
-  it("marks the Org scan history link active on /org-scans", () => {
+  it("marks the GitHub Org Scan History link active on /org-scans", () => {
     render(
       <MemoryRouter initialEntries={["/org-scans"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Org scan history" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "GitHub Org Scan History" })).toHaveClass("active");
   });
 
   it("renders the code security nav links", () => {
@@ -123,26 +123,46 @@ describe("Layout", () => {
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "New registry scan" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Registry scan history" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New Artifact Registry Scan" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Artifact Registry Scan History" })).toBeInTheDocument();
   });
 
-  it("marks the New registry scan link active on /registry-scan", () => {
+  it("marks the New Artifact Registry Scan link active on /registry-scan", () => {
     render(
       <MemoryRouter initialEntries={["/registry-scan"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "New registry scan" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "Registry scan history" })).not.toHaveClass("active");
+    expect(screen.getByRole("link", { name: "New Artifact Registry Scan" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Artifact Registry Scan History" })).not.toHaveClass("active");
   });
 
-  it("marks the Registry scan history link active on /registry-scans", () => {
+  it("marks the Artifact Registry Scan History link active on /registry-scans", () => {
     render(
       <MemoryRouter initialEntries={["/registry-scans"]}>
         <Layout>content</Layout>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Registry scan history" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Artifact Registry Scan History" })).toHaveClass("active");
+  });
+
+  it("renders the runtime defender nav links", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Install Golem Defender" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Kubernetes Clusters" })).toBeInTheDocument();
+  });
+
+  it("marks the Kubernetes Clusters link active on /runtime-clusters", () => {
+    render(
+      <MemoryRouter initialEntries={["/runtime-clusters"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Kubernetes Clusters" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Install Golem Defender" })).not.toHaveClass("active");
   });
 });

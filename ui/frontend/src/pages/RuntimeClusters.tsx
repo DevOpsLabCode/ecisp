@@ -29,7 +29,7 @@ export default function RuntimeClusters() {
   return (
     <>
       <div className="page-header">
-        <h1>Runtime Defender</h1>
+        <h1>Kubernetes Clusters</h1>
         <p>Every registered cluster, with live findings from its eBPF sensor.</p>
       </div>
 

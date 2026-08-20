@@ -28,7 +28,7 @@ describe("App", () => {
 
   it("renders the New scan page at the root route", async () => {
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "New scan" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "New CSPM Scan" })).toBeInTheDocument();
     expect(api.providers).toHaveBeenCalled();
   });
 

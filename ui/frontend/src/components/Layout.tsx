@@ -9,29 +9,29 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="sidebar-brand">
           <Logo size={30} />
           <div className="sidebar-brand-text">
-            ecisp
-            <span className="sub">Enterprise Cloud Discovery</span>
+            Golem
+            <span className="sub">Built to defend what you build</span>
           </div>
         </div>
         <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          New scan
+          New CSPM Scan
         </NavLink>
         <NavLink to="/jobs" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Scan history
         </NavLink>
         <div className="nav-section-label">Bulk</div>
         <NavLink to="/bulk-import" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          Import accounts
+          Import Cloud Accounts
         </NavLink>
         <NavLink to="/batches" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          Import history
+          Cloud Import History
         </NavLink>
         <div className="nav-section-label">Org Security</div>
         <NavLink to="/org-scans/new" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          New org scan
+          Scan GitHub Organization
         </NavLink>
         <NavLink to="/org-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          Org scan history
+          GitHub Org Scan History
         </NavLink>
         <div className="nav-section-label">Code Security</div>
         <NavLink to="/code-scan" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
@@ -42,17 +42,17 @@ export default function Layout({ children }: { children: ReactNode }) {
         </NavLink>
         <div className="nav-section-label">Registry Security</div>
         <NavLink to="/registry-scan" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          New registry scan
+          New Artifact Registry Scan
         </NavLink>
         <NavLink to="/registry-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          Registry scan history
+          Artifact Registry Scan History
         </NavLink>
         <div className="nav-section-label">Runtime Defender</div>
         <NavLink to="/runtime-defender/new" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Install Golem Defender
         </NavLink>
         <NavLink to="/runtime-clusters" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
-          Clusters
+          Kubernetes Clusters
         </NavLink>
         <div className="sidebar-footer">
           <a href="https://devopslabinc.com" target="_blank" rel="noreferrer">

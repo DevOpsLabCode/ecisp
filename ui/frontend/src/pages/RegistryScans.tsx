@@ -30,7 +30,7 @@ export default function RegistryScans() {
   return (
     <>
       <div className="page-header">
-        <h1>Registry scans</h1>
+        <h1>Artifact Registry Scan History</h1>
         <p>Every container image scan, most recent first.</p>
       </div>
 
