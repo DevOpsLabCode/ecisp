@@ -11,7 +11,9 @@
 # brakeman, security code scan) -- five language runtimes (Python, Go, JVM,
 # Ruby, .NET) plus Node, which makes this a genuinely large image. Each
 # toolchain is built in its own stage so a change to one (e.g. bumping the Go
-# version) doesn't invalidate every other stage's build cache.
+# version) doesn't invalidate every other stage's build cache. It also bundles
+# Trivy (SCA + secrets, app/orgscan/scanners/trivy_sca_secrets.py) and OWASP
+# ZAP (DAST, app/codescan/dast_scanner.py) for the code-scan feature.
 
 # --- app: the FastAPI web layer's own venv ---
 FROM python:3.11-slim AS app-builder
@@ -67,6 +69,34 @@ RUN curl -fsSL -o /tmp/spotbugs.tgz \
     && rm /tmp/spotbugs.tgz \
     && chmod +x /opt/spotbugs/bin/*
 
+# --- trivy: single static binary, downloaded release tarball like spotbugs
+# above -- provides both SCA (vuln) and secrets scanning in one pass. ---
+FROM debian:bookworm-slim AS trivy-builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/trivy.tgz \
+      https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz \
+    && mkdir -p /opt/trivy \
+    && tar -xzf /tmp/trivy.tgz -C /opt/trivy trivy \
+    && rm /tmp/trivy.tgz \
+    && chmod +x /opt/trivy/trivy
+
+# --- zap: OWASP ZAP, downloaded release tarball -- needs a JVM to *run*
+# (JDK already installed in the runtime stage below for spotbugs/brakeman),
+# not to unpack here. Verified live (this exact tarball, this exact
+# zap.sh -cmd -autorun invocation) against a real target during development. ---
+FROM debian:bookworm-slim AS zap-builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL -o /tmp/zap.tar.gz \
+      https://github.com/zaproxy/zaproxy/releases/download/v2.17.0/ZAP_2.17.0_Linux.tar.gz \
+    && mkdir -p /opt/zap \
+    && tar -xzf /tmp/zap.tar.gz -C /opt/zap --strip-components=1 \
+    && rm /tmp/zap.tar.gz \
+    && chmod +x /opt/zap/zap.sh
+
 # --- node tools: ESLint pinned to 8.x + eslint-plugin-security, kept in a
 # fixed location separate from the frontend's own node_modules or whatever
 # a scanned repo ships -- see scanners/eslint_security.py's docstring for
@@ -110,7 +140,7 @@ RUN apt-get update \
     && rm /tmp/dotnet-install.sh \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/opt/venv/bin:/usr/share/dotnet:/opt/gosec/bin:/opt/spotbugs/bin:/usr/local/go/bin:$PATH"
+ENV PATH="/opt/venv/bin:/usr/share/dotnet:/opt/gosec/bin:/opt/spotbugs/bin:/usr/local/go/bin:/opt/trivy:/opt/zap:$PATH"
 ENV JAVA_HOME="/usr/lib/jvm/default-java"
 ENV SCANNER_VENV="/opt/scanner-venv/bin"
 ENV ORGSCAN_ESLINT_TOOLS_DIR="/opt/orgscan-node-tools"
@@ -125,6 +155,8 @@ COPY --from=go-builder /go/bin/gosec /opt/gosec/bin/gosec
 # compiled gosec binary.
 COPY --from=go-builder /usr/local/go /usr/local/go
 COPY --from=spotbugs-builder /opt/spotbugs /opt/spotbugs
+COPY --from=trivy-builder /opt/trivy /opt/trivy
+COPY --from=zap-builder /opt/zap /opt/zap
 COPY --from=node-tools-builder /opt/orgscan-node-tools /opt/orgscan-node-tools
 # eslint's bin script itself needs a `node` binary on PATH to run -- this
 # runtime stage is python:3.11-slim, which has no Node install at all, only
@@ -143,7 +175,8 @@ WORKDIR /app
 COPY --from=app-builder /app/EnterpriseCloudDiscovery ./EnterpriseCloudDiscovery
 COPY --from=app-builder /app/setup.py /app/README.md ./
 COPY ui/backend/app ./ui/backend/app
-RUN mkdir -p ./ui/backend/data/reports ./ui/backend/data/orgscan-reports
+RUN mkdir -p ./ui/backend/data/reports ./ui/backend/data/orgscan-reports \
+      ./ui/backend/data/codescan-reports ./ui/backend/data/codescan-uploads
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app

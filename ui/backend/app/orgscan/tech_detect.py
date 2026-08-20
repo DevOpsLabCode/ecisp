@@ -100,4 +100,11 @@ def detect(repo_dir: Path) -> list[str]:
     if detected or (suffixes & code_suffixes):
         detected.add("semgrep")
 
+    # SCA (dependency vulnerabilities) and secret detection apply
+    # regardless of language -- trivy itself figures out which dependency
+    # manifests it recognizes, and a secret can land in any file type -- so
+    # unlike every other scanner above this one isn't gated on an
+    # indicator file at all.
+    detected.add("trivy")
+
     return sorted(detected)

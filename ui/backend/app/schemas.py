@@ -98,3 +98,52 @@ class RepoScanSummary(BaseModel):
 
 class OrgScanDetail(OrgScanSummary):
     repositories: list[RepoScanSummary]
+
+
+class CodeScanFromRepoRequest(BaseModel):
+    repo_url: str
+    branch: str | None = None
+
+
+class DastRequest(BaseModel):
+    target_url: str
+    spider_minutes: int = 2
+    active_scan_minutes: int = 5
+
+
+class CodeScanSummary(BaseModel):
+    id: str
+    source_type: str
+    source_label: str
+    branch: str | None = None
+    commit_sha: str | None = None
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    severity_counts: dict[str, int] | None = None
+    finding_count: int | None = None
+    dast_status: str
+    dast_target_url: str | None = None
+    dast_error: str | None = None
+
+
+class FindingOut(BaseModel):
+    repository: str
+    file: str
+    line: int | None = None
+    scanner: str
+    rule_id: str
+    severity: str
+    category: str
+    message: str
+    remediation: str | None = None
+    fingerprint: str
+
+
+class CodeScanDetail(CodeScanSummary):
+    technologies: list[str]
+    scanners_run: list[str]
+    scanners_skipped: dict[str, str]
+    findings: list[FindingOut]

@@ -84,6 +84,73 @@ installed" and just skip them for every repo, which is still safe (a scan
 completes with empty results) but not useful. Use the Docker image, or
 `ui/scripts/test-all.sh --docker`, to actually exercise this feature.
 
+## Code scanning (upload / repo URL, SAST + SCA + Secrets + IaC + DAST)
+
+A second entry point into the same scanner pipeline, scoped to a single
+codebase instead of a whole org: `New code scan` accepts either an uploaded
+`.zip`/`.tar`/`.tar.gz`/`.tgz` archive or a GitHub repository URL, and runs
+it through the identical SAST/SCA/Secrets/IaC scanners as org-wide scanning
+above, plus Trivy (dependency vulnerabilities + hardcoded secrets, one pass)
+and an optional DAST follow-up against a live application URL.
+
+**Upload flow**: the archive is extracted under strict containment checks
+before anything else runs — zip-slip/tar-slip path traversal, symlinks,
+hardlinks, device-special members, and oversized members/totals are all
+rejected outright (`app/codescan/archive_extract.py`), and the archive is
+never executed, only read. SpotBugs and Security Code Scan are skipped for
+uploads specifically, since both require compiling the target
+(`mvn`/`gradle`/`dotnet build`) — running an anonymous upload's own build
+tooling would mean executing untrusted code, which this flow explicitly
+does not do. They still run normally for the repo-URL flow.
+
+**Repo URL flow**: public repos scan with no authentication at all. Private
+repos need a "Connect GitHub" click, which opens the standard GitHub OAuth
+Authorization Code flow in the browser — the user approves access on
+github.com itself and is redirected back; the access token is exchanged
+server-side and held only in an httponly session cookie, never in a URL, a
+form field, or anywhere the frontend JS can read it. Branch selection is
+available before scanning, and the exact commit SHA that was scanned is
+recorded on the result either way.
+
+**DAST**: once a source scan (upload or repo) completes, optionally supply
+an authorized running application URL to run OWASP ZAP's automation
+framework (spider → passive scan → active scan → passive scan → SARIF
+report) against it. DAST findings merge into the same result and report as
+the source scan — one dashboard, one set of downloadable reports, not two
+separate outputs.
+
+Both source flows and DAST all funnel through the same
+`normalize.parse_sarif()` → `Finding` → report pipeline org-wide scanning
+uses, so the same five formats (SARIF, JSON, CSV, HTML, PDF) are available
+per scan, plus in-app Critical/High/Medium/Low findings display.
+
+Endpoints (`ui/backend/app/main.py`): `POST /api/code-scans/upload`,
+`GET /api/code-scans/branches?repo_url=...`, `POST /api/code-scans/repo`,
+`GET /api/code-scans` / `GET /api/code-scans/{id}`,
+`POST /api/code-scans/{id}/dast`, `GET /api/code-scans/{id}/report.{fmt}`,
+and `GET|POST /api/github/oauth/*` for the Connect-GitHub flow. See
+`ui/backend/app/codescan/` — `archive_extract.py` (safe extraction),
+`code_scan_job.py` (orchestration, mirrors `orgscan/org_scan_job.py`'s
+single-worker queue), `github_oauth.py` (the OAuth Authorization Code flow
+and in-memory CSRF-state/session stores), and `dast_scanner.py` (the ZAP
+automation-plan runner). Trivy's adapter lives alongside the other SAST
+tools at `app/orgscan/scanners/trivy_sca_secrets.py` since it's reused by
+both org-wide and single-repo scanning.
+
+To enable the private-repo "Connect GitHub" button, register a GitHub OAuth
+App (github.com/settings/developers → New OAuth App) with its callback URL
+set to `<BACKEND_URL>/api/github/oauth/callback`, and set
+`GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET` on the backend
+(`FRONTEND_URL`/`BACKEND_URL` env vars control the redirect targets, and
+default to this repo's own docker-compose ports). Without those two env
+vars set, `is_configured()` is false and the button surfaces that state
+instead of a broken login — public-repo scanning and uploads work
+regardless.
+
+Like org-wide scanning, this needs the full toolchain (plus Trivy and ZAP
+specifically) that only the Docker image installs — see the Dockerfile's
+`trivy-builder`/`zap-builder` stages.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —
@@ -286,3 +353,13 @@ gh run watch <run-id> --exit-status   # live tail of a specific run
   shape as cloud scans, for the same reason (process-global state) — but each
   org scan clones/scans its own repos concurrently via a thread pool
   (`max_workers`), so this isn't as serial as it sounds for a single scan.
+- **Code-scan reports/uploads directories**: written to
+  `ui/backend/data/codescan-reports` and `codescan-uploads` respectively
+  (the latter is emptied per-scan — uploaded archives are deleted once
+  extraction finishes, successfully or not). Same "nothing prunes the
+  reports, not a named volume, won't survive a container recreate" caveats
+  as org-scan above.
+- **GitHub OAuth sessions are in-memory, like every other job manager here**:
+  restarting the backend logs everyone's "Connect GitHub" session out (they
+  just click it again) — a deliberate scope choice, not an oversight, matching
+  how scan/org-scan/batch state is all in-memory too.
