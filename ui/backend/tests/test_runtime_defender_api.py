@@ -72,6 +72,22 @@ def test_get_install_script_404_for_unknown_cluster(isolated_manager):
     assert resp.status_code == 404
 
 
+def test_get_simulation_script_embeds_the_real_event_generator_image(isolated_manager):
+    create_resp = client.post("/api/runtime-clusters", json={"name": "prod-eks"})
+    cluster_id = create_resp.json()["id"]
+
+    resp = client.get(f"/api/runtime-clusters/{cluster_id}/simulate.sh")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/x-shellscript")
+    assert "falcosecurity/event-generator" in resp.text
+    assert "prod-eks" in resp.text
+
+
+def test_get_simulation_script_404_for_unknown_cluster(isolated_manager):
+    resp = client.get("/api/runtime-clusters/does-not-exist/simulate.sh")
+    assert resp.status_code == 404
+
+
 def test_ingest_event_stores_a_real_finding(isolated_manager):
     create_resp = client.post("/api/runtime-clusters", json={"name": "prod-eks"})
     cluster_id = create_resp.json()["id"]
