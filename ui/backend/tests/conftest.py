@@ -13,6 +13,8 @@ import asyncio
 import sys
 import types
 
+import pytest
+
 
 def _stub_run(**kwargs):
     # Mirrors the real engine's __main__.run(): it calls
@@ -59,3 +61,21 @@ def _install_stub_engine() -> None:
 
 
 _install_stub_engine()
+
+
+@pytest.fixture(autouse=True)
+def _no_subprocess_coverage(monkeypatch):
+    # pytest-cov auto-instruments any subprocess via COV_CORE_SOURCE/
+    # COV_CORE_CONFIG/COV_CORE_DATAFILE + a .pth hook coverage.py installs
+    # into site-packages -- confirmed by printing os.environ from inside a
+    # real `--cov` run. So a test that spawns a real subprocess (e.g.
+    # orgscan/scanners/base.py's run_capture, exercised directly against
+    # `python3 -c ...` in tests/orgscan/test_scanners_base.py) has that
+    # child process measured too, producing a statement-only coverage data
+    # file for it that fails to combine with this suite's branch-mode data
+    # ("Can't combine statement coverage data with branch data" --
+    # reproduced in CI). Nothing about a subprocess a test spawns needs to
+    # be coverage-measured anyway, so just don't propagate the env vars
+    # that trigger it.
+    for var in ("COV_CORE_SOURCE", "COV_CORE_CONFIG", "COV_CORE_DATAFILE"):
+        monkeypatch.delenv(var, raising=False)
