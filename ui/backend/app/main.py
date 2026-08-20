@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 
 from . import engine_runner
 from .batch_import import RowParseError, csv_template_text
@@ -15,8 +15,13 @@ from .codescan.github_oauth import OAuthError, OAuthNotConfigured
 from .jobs import REPORT_DIR, manager
 from .orgscan.github_client import GitHubAuthError, GitHubClient, parse_repo_url
 from .orgscan.org_scan_job import manager as org_scan_manager
+from .orgscan.reporting import csv_report, html_report, json_report
+from .orgscan.reporting import sarif as sarif_report
 from .providers_meta import list_providers
 from .registryscan.registry_scan_job import manager as registry_scan_manager
+from .runtimedefender.install_script import build_install_script
+from .runtimedefender.runtime_defender import ClusterNotFound, InvalidInstallToken, MalformedFalcoAlert
+from .runtimedefender.runtime_defender import manager as runtime_defender_manager
 from .schemas import (
     BatchDetail,
     BatchSummary,
@@ -32,6 +37,9 @@ from .schemas import (
     RegistryScanCreateRequest,
     RegistryScanDetail,
     RegistryScanSummary,
+    RuntimeClusterCreateRequest,
+    RuntimeClusterDetail,
+    RuntimeClusterSummary,
     ScanCreateRequest,
 )
 
@@ -456,3 +464,91 @@ def get_registry_scan_report(scan_id: str, fmt: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"{fmt} report not available for this scan")
     return FileResponse(path, media_type=_REPORT_MEDIA_TYPES[fmt], filename=_REPORT_FILENAMES[fmt])
+
+
+# ---------------------------------------------------------------------
+# Runtime Defender -- registers a Kubernetes cluster, hands back a one-line
+# install script that deploys the real Falco eBPF sensor + falcosidekick
+# (works against EKS/AKS/GKE/OpenShift/any standard cluster, since it's
+# just Kubernetes), and ingests the alerts that sensor reports back.
+# ---------------------------------------------------------------------
+@app.post("/api/runtime-clusters", response_model=RuntimeClusterDetail)
+def create_runtime_cluster(req: RuntimeClusterCreateRequest):
+    if not req.name.strip():
+        raise HTTPException(status_code=400, detail="name is required")
+    cluster = runtime_defender_manager.create_cluster(req.name.strip())
+    return cluster.detail()
+
+
+@app.get("/api/runtime-clusters", response_model=list[RuntimeClusterSummary])
+def list_runtime_clusters():
+    return [c.summary() for c in runtime_defender_manager.list()]
+
+
+@app.get("/api/runtime-clusters/{cluster_id}", response_model=RuntimeClusterDetail)
+def get_runtime_cluster(cluster_id: str):
+    cluster = runtime_defender_manager.get(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    return cluster.detail()
+
+
+@app.get("/api/runtime-clusters/{cluster_id}/install.sh")
+def get_runtime_cluster_install_script(cluster_id: str):
+    cluster = runtime_defender_manager.get(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    script = build_install_script(cluster.id, cluster.name, cluster.install_token, BACKEND_URL)
+    return PlainTextResponse(script, media_type="text/x-shellscript")
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/events", status_code=204)
+async def ingest_runtime_cluster_event(cluster_id: str, request: Request, token: str):
+    try:
+        payload = await request.json()
+    except Exception as exc:  # noqa: BLE001 -- any malformed body is the same 400 to the caller
+        raise HTTPException(status_code=400, detail="request body is not valid JSON") from exc
+
+    try:
+        runtime_defender_manager.ingest_event(cluster_id, token, payload)
+    except ClusterNotFound as exc:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found") from exc
+    except InvalidInstallToken as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except MalformedFalcoAlert as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@app.get("/api/runtime-clusters/{cluster_id}/report.{fmt}")
+def get_runtime_cluster_report(cluster_id: str, fmt: str):
+    cluster = runtime_defender_manager.get(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    if fmt not in _REPORT_FILENAMES:
+        raise HTTPException(status_code=404, detail=f"Unknown report format '{fmt}'")
+
+    results = [cluster.as_repo_scan_result()]
+    if fmt == "sarif":
+        body: str | bytes = sarif_report.to_sarif(results)
+    elif fmt == "json":
+        body = json_report.to_json(cluster.name, results)
+    elif fmt == "csv":
+        body = csv_report.to_csv(results)
+    elif fmt == "html":
+        body = html_report.to_html(cluster.name, results)
+    else:
+        try:
+            from .orgscan.reporting.pdf_report import to_pdf
+
+            body = to_pdf(cluster.name, results)
+        except Exception as exc:  # noqa: BLE001 -- PDF needs native libs (pango/cairo); a soft dependency everywhere else too
+            raise HTTPException(
+                status_code=503, detail="PDF report generation is unavailable in this deployment"
+            ) from exc
+
+    return Response(
+        content=body,
+        media_type=_REPORT_MEDIA_TYPES[fmt],
+        headers={"Content-Disposition": f'attachment; filename="{_REPORT_FILENAMES[fmt]}"'},
+    )

@@ -16,6 +16,9 @@ import type {
   RegistryScanDetail,
   RegistryScanSummary,
   RepoBranchesResponse,
+  RuntimeClusterCreateRequest,
+  RuntimeClusterDetail,
+  RuntimeClusterSummary,
   ScanCreateRequest,
   ScanResults,
 } from "../types";
@@ -113,4 +116,12 @@ export const api = {
   getRegistryScan: (id: string) => request<RegistryScanDetail>(`/api/registry-scans/${id}`),
   registryScanReportUrl: (id: string, fmt: "sarif" | "json" | "csv" | "html" | "pdf") =>
     `${BASE_URL}/api/registry-scans/${id}/report.${fmt}`,
+
+  createRuntimeCluster: (body: RuntimeClusterCreateRequest) =>
+    request<RuntimeClusterDetail>("/api/runtime-clusters", { method: "POST", body: JSON.stringify(body) }),
+  listRuntimeClusters: () => request<RuntimeClusterSummary[]>("/api/runtime-clusters"),
+  getRuntimeCluster: (id: string) => request<RuntimeClusterDetail>(`/api/runtime-clusters/${id}`),
+  runtimeClusterInstallScriptUrl: (id: string) => `${BASE_URL}/api/runtime-clusters/${id}/install.sh`,
+  runtimeClusterReportUrl: (id: string, fmt: "sarif" | "json" | "csv" | "html" | "pdf") =>
+    `${BASE_URL}/api/runtime-clusters/${id}/report.${fmt}`,
 };

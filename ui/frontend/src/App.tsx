@@ -10,11 +10,14 @@ import Jobs from "./pages/Jobs";
 import NewCodeScan from "./pages/NewCodeScan";
 import NewOrgScan from "./pages/NewOrgScan";
 import NewRegistryScan from "./pages/NewRegistryScan";
+import NewRuntimeCluster from "./pages/NewRuntimeCluster";
 import NewScan from "./pages/NewScan";
 import OrgScanDetail from "./pages/OrgScanDetail";
 import OrgScans from "./pages/OrgScans";
 import RegistryScanDetail from "./pages/RegistryScanDetail";
 import RegistryScans from "./pages/RegistryScans";
+import RuntimeClusterDetail from "./pages/RuntimeClusterDetail";
+import RuntimeClusters from "./pages/RuntimeClusters";
 
 function App() {
   return (
@@ -36,6 +39,9 @@ function App() {
           <Route path="/registry-scan" element={<NewRegistryScan />} />
           <Route path="/registry-scans" element={<RegistryScans />} />
           <Route path="/registry-scans/:id" element={<RegistryScanDetail />} />
+          <Route path="/runtime-defender/new" element={<NewRuntimeCluster />} />
+          <Route path="/runtime-clusters" element={<RuntimeClusters />} />
+          <Route path="/runtime-clusters/:id" element={<RuntimeClusterDetail />} />
         </Routes>
       </Layout>
     </BrowserRouter>
