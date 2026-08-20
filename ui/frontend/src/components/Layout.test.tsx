@@ -116,4 +116,33 @@ describe("Layout", () => {
     );
     expect(screen.getByRole("link", { name: "Code scan history" })).toHaveClass("active");
   });
+
+  it("renders the registry security nav links", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "New registry scan" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Registry scan history" })).toBeInTheDocument();
+  });
+
+  it("marks the New registry scan link active on /registry-scan", () => {
+    render(
+      <MemoryRouter initialEntries={["/registry-scan"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "New registry scan" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Registry scan history" })).not.toHaveClass("active");
+  });
+
+  it("marks the Registry scan history link active on /registry-scans", () => {
+    render(
+      <MemoryRouter initialEntries={["/registry-scans"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Registry scan history" })).toHaveClass("active");
+  });
 });

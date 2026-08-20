@@ -220,3 +220,30 @@ export interface GitHubOAuthStatus {
   connected: boolean;
   configured: boolean;
 }
+
+export type RegistryScanStatus = "queued" | "running" | "completed" | "failed";
+
+export interface RegistryScanCreateRequest {
+  image_ref: string;
+  username?: string | null;
+  password?: string | null;
+  registry_token?: string | null;
+  insecure?: boolean;
+}
+
+export interface RegistryScanSummary {
+  id: string;
+  image_ref: string;
+  status: RegistryScanStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+  severity_counts: Record<Severity, number> | null;
+  finding_count: number | null;
+}
+
+export interface RegistryScanDetail extends RegistryScanSummary {
+  scanners_run: string[];
+  findings: CodeScanFinding[];
+}
