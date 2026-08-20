@@ -87,4 +87,33 @@ describe("Layout", () => {
     );
     expect(screen.getByRole("link", { name: "Org scan history" })).toHaveClass("active");
   });
+
+  it("renders the code security nav links", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "New code scan" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Code scan history" })).toBeInTheDocument();
+  });
+
+  it("marks the New code scan link active on /code-scan", () => {
+    render(
+      <MemoryRouter initialEntries={["/code-scan"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "New code scan" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Code scan history" })).not.toHaveClass("active");
+  });
+
+  it("marks the Code scan history link active on /code-scans", () => {
+    render(
+      <MemoryRouter initialEntries={["/code-scans"]}>
+        <Layout>content</Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Code scan history" })).toHaveClass("active");
+  });
 });
