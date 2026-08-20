@@ -1,9 +1,9 @@
 {
-  "name": "ecisp-ui-frontend",
+  "name": "golem-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Web UI for the Enterprise Cloud Discovery engine",
+  "description": "Web UI for Golem, built on the Enterprise Cloud Discovery engine",
   "author": "Stan Zvenigorodskiy",
   "homepage": "https://devopslabinc.com",
   "engines": {

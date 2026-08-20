@@ -1,4 +1,4 @@
-# Local/CI stack for ecisp-ui. Run from the repo root or from ui/:
+# Local/CI stack for Golem. Run from the repo root or from ui/:
 #   docker compose -f ui/docker-compose.yml up --build
 #
 # Image names/tags are overridable (CI sets these to ghcr.io/... tags so the
@@ -8,7 +8,7 @@ services:
     build:
       context: ..
       dockerfile: ui/backend/Dockerfile
-    image: ${BACKEND_IMAGE:-ecisp-backend:local}
+    image: ${BACKEND_IMAGE:-golem-backend:local}
     ports:
       - "8000:8000"
     environment:
@@ -45,7 +45,7 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
-    image: ${FRONTEND_IMAGE:-ecisp-frontend:local}
+    image: ${FRONTEND_IMAGE:-golem-frontend:local}
     ports:
       - "8080:80"
     depends_on:

@@ -1,4 +1,4 @@
-# ecisp-ui
+# Golem
 
 A web UI for the [Enterprise Cloud Discovery Engine](../README.md): configure a
 provider scan, launch it, and browse the findings without touching the CLI.

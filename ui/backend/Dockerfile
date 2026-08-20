@@ -4,7 +4,7 @@
 # location, so the in-container layout mirrors the repo layout exactly:
 # /app == repo root, /app/ui/backend/app == this package.
 #
-#   docker build -f ui/backend/Dockerfile -t ecisp-backend .
+#   docker build -f ui/backend/Dockerfile -t golem-backend .
 #
 # This image also bundles the full toolchain for app/orgscan/'s eight SAST
 # scanners (checkov, bandit, semgrep, gosec, spotbugs, eslint-plugin-security,

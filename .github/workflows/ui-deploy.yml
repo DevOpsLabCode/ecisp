@@ -1,6 +1,6 @@
 name: ui-deploy
 
-# Builds the ecisp-ui backend + frontend as Docker images, brings the real
+# Builds the Golem backend + frontend as Docker images, brings the real
 # stack online with docker compose, smoke-tests it end to end, and (outside
 # of pull requests) publishes the tested images to GHCR.
 #
