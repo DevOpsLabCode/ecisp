@@ -1,10 +1,10 @@
 # The FastAPI web layer only. No engine, no test tooling -- this is what
 # the production Docker image installs on top of the engine's own
 # requirements.txt.
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-pydantic==2.10.3
-python-multipart==0.0.20
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+pydantic==2.13.4
+python-multipart==0.0.32
 openpyxl==3.1.5
 
 # Org-wide GitHub security scanner (app/orgscan/): GitHub REST API client,
