@@ -181,6 +181,63 @@ Live-verified against real images: `alpine:3.18` (clean pull, 0 findings)
 and `node:14.0.0` (3231 genuine CVE findings, real severities, real
 report downloads) through the actual running Docker stack, not mocks.
 
+## Runtime Defender (Golem)
+
+A fourth, deliberately different kind of scan: instead of scanning a
+snapshot (a repo, an org, an image), Runtime Defender watches a live
+Kubernetes cluster for suspicious behavior as it happens — process
+execution, sensitive file access, container drift — using
+[Falco](https://falco.org), the CNCF eBPF-based runtime security sensor,
+rather than anything custom-built.
+
+**Install flow**: `Install Golem Defender` registers a cluster (just a
+name) and returns a one-line `curl ... | bash` command with a unique
+webhook URL and install token baked in. Run it against whichever cluster
+your `kubectl` context points at — it `helm install`s the real Falco
+chart plus [falcosidekick](https://github.com/falcosecurity/falcosidekick)
+(which forwards Falco's alerts to arbitrary outputs; configured here with
+its `webhook` output pointed back at this cluster's endpoint), and nothing
+else. No agent to build, no custom kernel module.
+
+**Why `driver.kind=modern_ebpf`**: Falco supports several ways to hook
+into the kernel; `modern_ebpf` is the one that needs no kernel headers and
+no privileged kernel-module loading (many managed/hardened clusters block
+that), and every EKS/AKS/GKE/OpenShift default node image ships a kernel
+new enough (5.8+) to run it. One driver choice covers all four distros —
+the same "it's just Kubernetes" reasoning that made the registry scanner's
+"any OCI registry" and the code scanner's "any git host" free.
+
+**Detect-and-report only**: this is v1's deliberate scope. Falco alerts
+flow in, get normalized into the same `Finding` shape every other scan
+type uses, and accumulate against the cluster — nothing is ever blocked,
+killed, or quarantined automatically. Unlike the other three scan types
+(each models "kick off one run, it finishes"), a cluster's findings stream
+in indefinitely, so this is a plain in-memory registry rather than a job
+queue, and the five report formats are generated on demand from whatever
+has accumulated so far rather than rewritten after every single alert.
+
+**SCA correlation**: if a runtime alert names a container image that this
+app has already scanned via registry scanning, the finding's remediation
+gets a note naming the exact CVE count and severity breakdown for that
+image — "this container is running image X, which a registry scan found
+to have 14 known vulnerabilities: 4 high, 8 medium, 2 low." That's a plain
+join across two data sets this app already has (a running container's
+exact image reference, and that image's own SCA results), not a
+vendor integration.
+
+Every Falco priority level maps onto the same five-level severity scale
+the rest of the app uses (Critical/Alert/Emergency → critical, Error →
+high, Warning → medium, Notice → low, Informational/Debug → info; an
+unrecognized priority falls back to medium rather than crashing).
+
+Live-verified end to end against a real local `kind` cluster: real Falco
++ falcosidekick Helm install, a real attack (`cat /etc/shadow` inside a
+pod) detected by the real eBPF sensor, delivered through a real webhook
+POST into the running backend, and — for the correlation feature — a real
+registry scan of `alpine:3.9` (14 genuine CVEs) whose results showed up
+verbatim in the next runtime alert's remediation text, confirmed both via
+the API and rendered in the actual UI.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —
@@ -397,3 +454,10 @@ gh run watch <run-id> --exit-status   # live tail of a specific run
   `ui/backend/data/registryscan-reports`, same "nothing prunes it, not a
   named volume, won't survive a container recreate" caveats as the other
   two report directories above.
+- **Runtime Defender clusters/findings are in-memory, like every other job
+  manager here**: restarting the backend forgets every registered cluster,
+  install token, and accumulated finding — a running Falco DaemonSet will
+  keep POSTing to a webhook URL that now 404s until the cluster is
+  re-registered and pointed at the new install command. No report
+  directory either: reports are generated on demand from whatever's
+  currently in memory, so there's nothing to prune in the first place.

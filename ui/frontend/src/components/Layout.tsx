@@ -47,6 +47,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <NavLink to="/registry-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Registry scan history
         </NavLink>
+        <div className="nav-section-label">Runtime Defender</div>
+        <NavLink to="/runtime-defender/new" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          Install Golem Defender
+        </NavLink>
+        <NavLink to="/runtime-clusters" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          Clusters
+        </NavLink>
         <div className="sidebar-footer">
           <a href="https://devopslabinc.com" target="_blank" rel="noreferrer">
             A DevOps Lab product

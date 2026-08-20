@@ -172,3 +172,21 @@ class RegistryScanSummary(BaseModel):
 class RegistryScanDetail(RegistryScanSummary):
     scanners_run: list[str]
     findings: list[FindingOut]
+
+
+class RuntimeClusterCreateRequest(BaseModel):
+    name: str
+
+
+class RuntimeClusterSummary(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    last_event_at: str | None = None
+    severity_counts: dict[str, int]
+    finding_count: int
+
+
+class RuntimeClusterDetail(RuntimeClusterSummary):
+    install_token: str
+    findings: list[FindingOut]
