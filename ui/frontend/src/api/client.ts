@@ -12,6 +12,9 @@ import type {
   OrgScanDetail,
   OrgScanSummary,
   ProviderMeta,
+  RegistryScanCreateRequest,
+  RegistryScanDetail,
+  RegistryScanSummary,
   RepoBranchesResponse,
   ScanCreateRequest,
   ScanResults,
@@ -103,4 +106,11 @@ export const api = {
   githubOAuthLoginUrl: () => `${BASE_URL}/api/github/oauth/login`,
   githubOAuthLogout: () =>
     fetch(`${BASE_URL}/api/github/oauth/logout`, { method: "POST", credentials: "include" }).then(handleErrors),
+
+  createRegistryScan: (body: RegistryScanCreateRequest) =>
+    request<RegistryScanSummary>("/api/registry-scans", { method: "POST", body: JSON.stringify(body) }),
+  listRegistryScans: () => request<RegistryScanSummary[]>("/api/registry-scans"),
+  getRegistryScan: (id: string) => request<RegistryScanDetail>(`/api/registry-scans/${id}`),
+  registryScanReportUrl: (id: string, fmt: "sarif" | "json" | "csv" | "html" | "pdf") =>
+    `${BASE_URL}/api/registry-scans/${id}/report.${fmt}`,
 };

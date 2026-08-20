@@ -275,4 +275,34 @@ describe("api client", () => {
     globalThis.fetch = mockFetchOnce({ detail: "no active session" }, { ok: false, status: 400 });
     await expect(api.githubOAuthLogout()).rejects.toThrow("no active session");
   });
+
+  it("createRegistryScan() POSTs to /api/registry-scans with the body serialized", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "scan-1", status: "queued" });
+    const body = { image_ref: "alpine:3.18", username: null, password: null, registry_token: null, insecure: false };
+    const result = await api.createRegistryScan(body);
+    expect(result.id).toBe("scan-1");
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it("listRegistryScans() calls /api/registry-scans", async () => {
+    globalThis.fetch = mockFetchOnce([{ id: "scan-1" }]);
+    const result = await api.listRegistryScans();
+    expect(result).toEqual([{ id: "scan-1" }]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/registry-scans"), expect.anything());
+  });
+
+  it("getRegistryScan() calls /api/registry-scans/:id", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "scan-1" });
+    await api.getRegistryScan("scan-1");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/registry-scans/scan-1"),
+      expect.anything(),
+    );
+  });
+
+  it("registryScanReportUrl() returns an absolute URL for the given format", () => {
+    expect(api.registryScanReportUrl("scan-1", "sarif")).toContain("/api/registry-scans/scan-1/report.sarif");
+  });
 });

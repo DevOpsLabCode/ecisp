@@ -151,6 +151,36 @@ Like org-wide scanning, this needs the full toolchain (plus Trivy and ZAP
 specifically) that only the Docker image installs — see the Dockerfile's
 `trivy-builder`/`zap-builder` stages.
 
+## Container registry scanning
+
+A third scan type, orthogonal to the two above: `New registry scan` scans
+one **container image** — pulled straight from JFrog Artifactory, Docker
+Hub, GitHub Container Registry, AWS ECR, Google Artifact Registry, Azure
+ACR, Harbor, Quay.io, or any other registry that speaks the standard
+Docker Registry HTTP API v2 / OCI Distribution Spec. This isn't
+vendor-specific integration work: Trivy's `trivy image` command already
+resolves an image reference against that standard protocol — the same one
+`docker pull` speaks — so one code path covers every registry above, and
+"and others" is free.
+
+Give it an image reference (`myregistry.jfrog.io/docker-local/app:1.2.3`)
+and, for private images, a username/password or registry token. Trivy
+scans for both dependency vulnerabilities and hardcoded secrets in one
+pass, the same as the code-scan pipeline's SCA step, and produces the same
+five report formats plus an in-app findings browser.
+
+Credentials are passed to the `trivy image` subprocess as environment
+variables (`TRIVY_USERNAME`/`TRIVY_PASSWORD`/`TRIVY_REGISTRY_TOKEN`) —
+verified live that Trivy's CLI binds these automatically — never as
+command-line arguments (which `ps` on the host would expose) and never
+persisted; used once for that scan and discarded. See
+`ui/backend/app/registryscan/image_scanner.py` for the adapter and
+`registry_scan_job.py` for the (simplest of the three) job queue.
+
+Live-verified against real images: `alpine:3.18` (clean pull, 0 findings)
+and `node:14.0.0` (3231 genuine CVE findings, real severities, real
+report downloads) through the actual running Docker stack, not mocks.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —
@@ -363,3 +393,7 @@ gh run watch <run-id> --exit-status   # live tail of a specific run
   restarting the backend logs everyone's "Connect GitHub" session out (they
   just click it again) — a deliberate scope choice, not an oversight, matching
   how scan/org-scan/batch state is all in-memory too.
+- **Registry-scan reports directory**: written to
+  `ui/backend/data/registryscan-reports`, same "nothing prunes it, not a
+  named volume, won't survive a container recreate" caveats as the other
+  two report directories above.
