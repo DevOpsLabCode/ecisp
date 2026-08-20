@@ -12,6 +12,9 @@ vi.mock("../api/client", () => ({
     runtimeClusterReportUrl: vi.fn(
       (id: string, fmt: string) => `http://localhost:8000/api/runtime-clusters/${id}/report.${fmt}`,
     ),
+    runtimeClusterSimulationScriptUrl: vi.fn(
+      (id: string) => `http://localhost:8000/api/runtime-clusters/${id}/simulate.sh`,
+    ),
   },
 }));
 
@@ -152,6 +155,37 @@ describe("RuntimeClusterDetail", () => {
 
     await vi.advanceTimersByTimeAsync(5100);
     expect(api.getRuntimeCluster).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the attack simulation command only after the user asks for it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getRuntimeCluster).mockResolvedValue(makeCluster());
+    renderAt("/runtime-clusters/cluster-1");
+    await screen.findByRole("heading", { name: "prod-eks" });
+
+    expect(
+      screen.queryByText("curl -fsSL http://localhost:8000/api/runtime-clusters/cluster-1/simulate.sh | bash"),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show simulation command" }));
+    expect(
+      screen.getByText("curl -fsSL http://localhost:8000/api/runtime-clusters/cluster-1/simulate.sh | bash"),
+    ).toBeInTheDocument();
+  });
+
+  it("copies the attack simulation command to the clipboard", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getRuntimeCluster).mockResolvedValue(makeCluster());
+    renderAt("/runtime-clusters/cluster-1");
+    await screen.findByRole("heading", { name: "prod-eks" });
+
+    await user.click(screen.getByRole("button", { name: "Show simulation command" }));
+    await user.click(screen.getByRole("button", { name: "Copy" }));
+
+    expect(await navigator.clipboard.readText()).toBe(
+      "curl -fsSL http://localhost:8000/api/runtime-clusters/cluster-1/simulate.sh | bash",
+    );
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 
   it("ignores a getRuntimeCluster response that resolves after unmount", async () => {

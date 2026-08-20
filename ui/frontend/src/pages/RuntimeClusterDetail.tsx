@@ -30,6 +30,8 @@ export default function RuntimeClusterDetail() {
   const [severityFilter, setSeverityFilter] = useState<Set<Severity>>(new Set(SEVERITIES));
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showSimulate, setShowSimulate] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +77,14 @@ export default function RuntimeClusterDetail() {
     return <p>Loading…</p>;
   }
 
+  const simulateCommand = `curl -fsSL ${api.runtimeClusterSimulationScriptUrl(cluster.id)} | bash`;
+
+  const handleCopySimulate = async () => {
+    await navigator.clipboard.writeText(simulateCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <>
       <div className="page-header">
@@ -85,6 +95,29 @@ export default function RuntimeClusterDetail() {
             ? ` · Last event ${new Date(cluster.last_event_at).toLocaleString()}`
             : " · No events received yet"}
         </p>
+      </div>
+
+      <div className="card">
+        <h2>Test this Defender</h2>
+        <p className="help" style={{ marginBottom: 14 }}>
+          Fire a real, benign MITRE ATT&amp;CK-style attack simulation at this cluster and watch the
+          alerts land here within about a minute — no need to wait for a real incident. Runs{" "}
+          <code>falcosecurity/event-generator</code> (the same tool the Falco project uses to test its
+          own rules) as a disposable pod; everything it touches stays inside that pod, which deletes
+          itself when done.
+        </p>
+        {!showSimulate ? (
+          <button className="btn" onClick={() => setShowSimulate(true)}>
+            Show simulation command
+          </button>
+        ) : (
+          <div className="code-block">
+            <code>{simulateCommand}</code>
+            <button className="btn" onClick={handleCopySimulate}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        )}
       </div>
 
       {cluster.finding_count === 0 ? (

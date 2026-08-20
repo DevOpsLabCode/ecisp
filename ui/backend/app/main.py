@@ -19,6 +19,7 @@ from .orgscan.reporting import csv_report, html_report, json_report
 from .orgscan.reporting import sarif as sarif_report
 from .providers_meta import list_providers
 from .registryscan.registry_scan_job import manager as registry_scan_manager
+from .runtimedefender.attack_simulation_script import build_simulation_script
 from .runtimedefender.install_script import build_install_script
 from .runtimedefender.runtime_defender import ClusterNotFound, InvalidInstallToken, MalformedFalcoAlert
 from .runtimedefender.runtime_defender import manager as runtime_defender_manager
@@ -500,6 +501,15 @@ def get_runtime_cluster_install_script(cluster_id: str):
     if not cluster:
         raise HTTPException(status_code=404, detail="Runtime cluster not found")
     script = build_install_script(cluster.id, cluster.name, cluster.install_token, BACKEND_URL)
+    return PlainTextResponse(script, media_type="text/x-shellscript")
+
+
+@app.get("/api/runtime-clusters/{cluster_id}/simulate.sh")
+def get_runtime_cluster_simulation_script(cluster_id: str):
+    cluster = runtime_defender_manager.get(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    script = build_simulation_script(cluster.name)
     return PlainTextResponse(script, media_type="text/x-shellscript")
 
 

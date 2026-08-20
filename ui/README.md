@@ -238,6 +238,29 @@ registry scan of `alpine:3.9` (14 genuine CVEs) whose results showed up
 verbatim in the next runtime alert's remediation text, confirmed both via
 the API and rendered in the actual UI.
 
+**Attack simulation**: a cluster's detail page also has a `Test this
+Defender` card with its own one-line `curl ... | bash` command, so a user
+can generate real findings on demand instead of waiting for a real
+incident. It runs [`falcosecurity/event-generator`](https://github.com/falcosecurity/event-generator)
+— the same tool the Falco project itself uses to test Falco's own rules —
+as a single disposable pod (`kubectl run ... --rm`) against whichever
+cluster `kubectl` currently points at. Its default action set fires ~20
+benign syscalls matching real Falco rules tagged with real MITRE ATT&CK
+technique IDs (credential access, defense evasion, persistence, and
+more); everything it touches is confined to that one pod's own
+filesystem, and the pod deletes itself the instant it finishes. No
+install token is involved — the script never talks to ECISP directly, it
+only triggers syscalls that the cluster's already-deployed Falco sensor
+picks up and reports through the webhook path that's already configured.
+
+Live-verified: one run of the tool's default action set against a real
+`kind` cluster fired 18 distinct Falco rules covering 11 distinct MITRE
+ATT&CK technique IDs (T1059, T1552, T1555, T1070, T1485, and others),
+completed in well under a minute, and the resulting 21 findings — 5
+critical, 12 medium, 4 low — showed up correctly in the running backend
+and rendered in the actual UI, run via the exact `curl | bash` command
+the UI displays (not a shortcut around it).
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —

@@ -122,6 +122,7 @@ export const api = {
   listRuntimeClusters: () => request<RuntimeClusterSummary[]>("/api/runtime-clusters"),
   getRuntimeCluster: (id: string) => request<RuntimeClusterDetail>(`/api/runtime-clusters/${id}`),
   runtimeClusterInstallScriptUrl: (id: string) => `${BASE_URL}/api/runtime-clusters/${id}/install.sh`,
+  runtimeClusterSimulationScriptUrl: (id: string) => `${BASE_URL}/api/runtime-clusters/${id}/simulate.sh`,
   runtimeClusterReportUrl: (id: string, fmt: "sarif" | "json" | "csv" | "html" | "pdf") =>
     `${BASE_URL}/api/runtime-clusters/${id}/report.${fmt}`,
 };
