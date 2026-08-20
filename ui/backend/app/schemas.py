@@ -147,3 +147,28 @@ class CodeScanDetail(CodeScanSummary):
     scanners_run: list[str]
     scanners_skipped: dict[str, str]
     findings: list[FindingOut]
+
+
+class RegistryScanCreateRequest(BaseModel):
+    image_ref: str
+    username: str | None = None
+    password: str | None = None
+    registry_token: str | None = None
+    insecure: bool = False
+
+
+class RegistryScanSummary(BaseModel):
+    id: str
+    image_ref: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    severity_counts: dict[str, int] | None = None
+    finding_count: int | None = None
+
+
+class RegistryScanDetail(RegistryScanSummary):
+    scanners_run: list[str]
+    findings: list[FindingOut]

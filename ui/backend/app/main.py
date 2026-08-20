@@ -16,6 +16,7 @@ from .jobs import REPORT_DIR, manager
 from .orgscan.github_client import GitHubAuthError, GitHubClient, parse_repo_url
 from .orgscan.org_scan_job import manager as org_scan_manager
 from .providers_meta import list_providers
+from .registryscan.registry_scan_job import manager as registry_scan_manager
 from .schemas import (
     BatchDetail,
     BatchSummary,
@@ -28,6 +29,9 @@ from .schemas import (
     OrgScanCreateRequest,
     OrgScanDetail,
     OrgScanSummary,
+    RegistryScanCreateRequest,
+    RegistryScanDetail,
+    RegistryScanSummary,
     ScanCreateRequest,
 )
 
@@ -395,6 +399,54 @@ def get_code_scan_report(scan_id: str, fmt: str):
     scan = code_scan_manager.get(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Code scan not found")
+    if scan.status != "completed":
+        raise HTTPException(status_code=409, detail=f"Scan is {scan.status}, not completed")
+    if fmt not in _REPORT_FILENAMES:
+        raise HTTPException(status_code=404, detail=f"Unknown report format '{fmt}'")
+
+    path = scan._report_dir() / _REPORT_FILENAMES[fmt]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{fmt} report not available for this scan")
+    return FileResponse(path, media_type=_REPORT_MEDIA_TYPES[fmt], filename=_REPORT_FILENAMES[fmt])
+
+
+# ---------------------------------------------------------------------
+# Container registry image scanning -- one image reference, pulled and
+# scanned via Trivy against JFrog Artifactory, Docker Hub, GHCR, ECR, GCR,
+# ACR, Harbor, Quay, or any other OCI/Docker-v2-compliant registry.
+# ---------------------------------------------------------------------
+@app.post("/api/registry-scans", response_model=RegistryScanSummary)
+def create_registry_scan(req: RegistryScanCreateRequest):
+    if not req.image_ref.strip():
+        raise HTTPException(status_code=400, detail="image_ref is required")
+    scan = registry_scan_manager.create(
+        req.image_ref.strip(),
+        username=req.username or None,
+        password=req.password or None,
+        registry_token=req.registry_token or None,
+        insecure=req.insecure,
+    )
+    return scan.summary()
+
+
+@app.get("/api/registry-scans", response_model=list[RegistryScanSummary])
+def list_registry_scans():
+    return [scan.summary() for scan in registry_scan_manager.list()]
+
+
+@app.get("/api/registry-scans/{scan_id}", response_model=RegistryScanDetail)
+def get_registry_scan(scan_id: str):
+    scan = registry_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Registry scan not found")
+    return scan.detail()
+
+
+@app.get("/api/registry-scans/{scan_id}/report.{fmt}")
+def get_registry_scan_report(scan_id: str, fmt: str):
+    scan = registry_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Registry scan not found")
     if scan.status != "completed":
         raise HTTPException(status_code=409, detail=f"Scan is {scan.status}, not completed")
     if fmt not in _REPORT_FILENAMES:

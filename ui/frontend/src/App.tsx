@@ -9,9 +9,12 @@ import JobDetail from "./pages/JobDetail";
 import Jobs from "./pages/Jobs";
 import NewCodeScan from "./pages/NewCodeScan";
 import NewOrgScan from "./pages/NewOrgScan";
+import NewRegistryScan from "./pages/NewRegistryScan";
 import NewScan from "./pages/NewScan";
 import OrgScanDetail from "./pages/OrgScanDetail";
 import OrgScans from "./pages/OrgScans";
+import RegistryScanDetail from "./pages/RegistryScanDetail";
+import RegistryScans from "./pages/RegistryScans";
 
 function App() {
   return (
@@ -30,6 +33,9 @@ function App() {
           <Route path="/code-scan" element={<NewCodeScan />} />
           <Route path="/code-scans" element={<CodeScans />} />
           <Route path="/code-scans/:id" element={<CodeScanDetail />} />
+          <Route path="/registry-scan" element={<NewRegistryScan />} />
+          <Route path="/registry-scans" element={<RegistryScans />} />
+          <Route path="/registry-scans/:id" element={<RegistryScanDetail />} />
         </Routes>
       </Layout>
     </BrowserRouter>
