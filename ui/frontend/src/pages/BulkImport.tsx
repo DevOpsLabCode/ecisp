@@ -25,7 +25,7 @@ export default function BulkImport() {
   return (
     <>
       <div className="page-header">
-        <h1>Import Cloud Accounts</h1>
+        <h1>Bulk Account Import</h1>
         <p>
           Scan many accounts at once. Each row in the file is one account's full scan
           configuration — provider, auth, and scope — so a single import can mix providers

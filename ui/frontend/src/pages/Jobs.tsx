@@ -30,7 +30,7 @@ export default function Jobs() {
   return (
     <>
       <div className="page-header">
-        <h1>Scan history</h1>
+        <h1>CSPM Findings</h1>
         <p>All scans launched from this UI, most recent first.</p>
       </div>
 

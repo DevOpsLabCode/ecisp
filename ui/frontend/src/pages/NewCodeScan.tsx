@@ -95,7 +95,7 @@ export default function NewCodeScan() {
   return (
     <>
       <div className="page-header">
-        <h1>New code scan</h1>
+        <h1>New Code Scan</h1>
         <p>
           Scan a single codebase — upload an archive or point at a GitHub repository — through the
           same SAST/SCA/Secrets/IaC pipeline as org-wide scanning, with an optional DAST follow-up

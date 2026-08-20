@@ -30,7 +30,7 @@ export default function CodeScans() {
   return (
     <>
       <div className="page-header">
-        <h1>Code scans</h1>
+        <h1>Code Security Findings</h1>
         <p>Every uploaded archive or repo-URL scan, most recent first.</p>
       </div>
 

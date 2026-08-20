@@ -39,7 +39,7 @@ export default function NewOrgScan() {
   return (
     <>
       <div className="page-header">
-        <h1>Scan GitHub Organization</h1>
+        <h1>New GitHub Org Scan</h1>
         <p>
           Discovers every repository in a GitHub organization (or personal account), clones each
           one, and runs the SAST scanners relevant to what it finds — Checkov, Bandit, Semgrep,

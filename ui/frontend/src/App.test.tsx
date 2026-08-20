@@ -35,7 +35,7 @@ describe("App", () => {
   it("renders the Jobs page at /jobs", async () => {
     window.history.pushState({}, "", "/jobs");
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Scan history" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "CSPM Findings" })).toBeInTheDocument();
     expect(api.listScans).toHaveBeenCalled();
   });
 });

@@ -29,7 +29,7 @@ export default function Batches() {
   return (
     <>
       <div className="page-header">
-        <h1>Cloud Import History</h1>
+        <h1>Import Jobs</h1>
         <p>Every CSV/XLSX/JSON import, most recent first.</p>
       </div>
 
