@@ -106,3 +106,53 @@ export interface BatchDetail extends BatchSummary {
   jobs: JobSummary[];
   errors: RowError[];
 }
+
+export type OrgScanStatus = "queued" | "running" | "completed" | "failed";
+
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
+
+export interface OrgScanCreateRequest {
+  org: string;
+  github_token: string;
+  notify_email?: string | null;
+  create_issues: boolean;
+  max_workers: number;
+  include_archived: boolean;
+}
+
+export interface OrgScanSummary {
+  id: string;
+  org: string;
+  status: OrgScanStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+  total_repos: number;
+  completed_repos: number;
+  repos_with_findings: number;
+  severity_totals: Record<Severity, number>;
+  issues_created: number;
+  email_sent: boolean;
+}
+
+export interface IssueOutcome {
+  action: string;
+  issue_url?: string | null;
+  error?: string | null;
+}
+
+export interface RepoScanSummary {
+  repository: string;
+  technologies: string[];
+  scanners_run: string[];
+  scanners_skipped: Record<string, string>;
+  severity_counts: Record<Severity, number>;
+  finding_count: number;
+  error: string | null;
+  issue: IssueOutcome | null;
+}
+
+export interface OrgScanDetail extends OrgScanSummary {
+  repositories: RepoScanSummary[];
+}

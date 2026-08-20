@@ -139,4 +139,41 @@ describe("api client", () => {
   it("batchTemplateUrl() returns an absolute URL to the CSV template", () => {
     expect(api.batchTemplateUrl()).toContain("/api/batches/template.csv");
   });
+
+  it("createOrgScan() POSTs to /api/org-scans with the body serialized", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "scan-1", status: "queued" });
+    const body = {
+      org: "my-org",
+      github_token: "ghp_abc",
+      notify_email: null,
+      create_issues: true,
+      max_workers: 4,
+      include_archived: false,
+    };
+    const result = await api.createOrgScan(body);
+    expect(result.id).toBe("scan-1");
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it("listOrgScans() calls /api/org-scans", async () => {
+    globalThis.fetch = mockFetchOnce([{ id: "scan-1" }]);
+    const result = await api.listOrgScans();
+    expect(result).toEqual([{ id: "scan-1" }]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/org-scans"), expect.anything());
+  });
+
+  it("getOrgScan() calls /api/org-scans/:id", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "scan-1" });
+    await api.getOrgScan("scan-1");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/org-scans/scan-1"),
+      expect.anything(),
+    );
+  });
+
+  it("orgScanReportUrl() returns an absolute URL for the given format", () => {
+    expect(api.orgScanReportUrl("scan-1", "sarif")).toContain("/api/org-scans/scan-1/report.sarif");
+  });
 });

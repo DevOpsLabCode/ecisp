@@ -6,3 +6,12 @@ uvicorn[standard]==0.32.1
 pydantic==2.10.3
 python-multipart==0.0.20
 openpyxl==3.1.5
+
+# Org-wide GitHub security scanner (app/orgscan/): GitHub REST API client,
+# HTML->PDF report rendering (weasyprint needs pango/cairo -- installed via
+# apt in the Dockerfile; PDF generation is a soft dependency, see
+# org_scan_job.py's _write_reports, so its absence doesn't block the other
+# four report formats).
+httpx==0.28.1
+weasyprint==69.0
+defusedxml==0.7.1

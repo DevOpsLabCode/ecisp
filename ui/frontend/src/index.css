@@ -7,6 +7,8 @@
   --text-muted: #8b96a5;
   --accent: #4f8cff;
   --accent-dim: #2c4a80;
+  --critical: #ff3b5c;
+  --critical-bg: rgba(255, 59, 92, 0.15);
   --danger: #f0546a;
   --danger-bg: rgba(240, 84, 106, 0.12);
   --warning: #e8a53d;
@@ -365,6 +367,10 @@ tr.clickable:hover {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+.badge.critical {
+  background: var(--critical-bg);
+  color: var(--critical);
+}
 .badge.danger {
   background: var(--danger-bg);
   color: var(--danger);
@@ -413,6 +419,9 @@ tr.clickable:hover {
   color: var(--text-muted);
   font-size: 12px;
   margin-top: 6px;
+}
+.stat-tile.critical .num {
+  color: var(--critical);
 }
 .stat-tile.danger .num {
   color: var(--danger);

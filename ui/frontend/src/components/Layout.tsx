@@ -26,6 +26,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <NavLink to="/batches" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Import history
         </NavLink>
+        <div className="nav-section-label">Org Security</div>
+        <NavLink to="/org-scans/new" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          New org scan
+        </NavLink>
+        <NavLink to="/org-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          Org scan history
+        </NavLink>
         <div className="sidebar-footer">
           <a href="https://devopslabinc.com" target="_blank" rel="noreferrer">
             A DevOps Lab product
