@@ -1,6 +1,8 @@
 backend/.venv*/
 backend/data/reports/*
 !backend/data/reports/.gitkeep
+backend/data/orgscan-reports/*
+!backend/data/orgscan-reports/.gitkeep
 backend/htmlcov/
 backend/.coverage
 backend/coverage.xml

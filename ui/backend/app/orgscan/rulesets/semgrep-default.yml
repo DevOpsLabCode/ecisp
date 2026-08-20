@@ -1,0 +1,19 @@
+rules:
+  - id: hardcoded-secret-assignment
+    languages: [regex]
+    severity: ERROR
+    message: Possible hardcoded secret/credential assigned to a variable.
+    paths:
+      exclude:
+        - "*.min.js"
+    pattern-regex: (?i)(password|secret|token|api_key|apikey|access_key)\s*[:=]\s*["'][^"'\s]{6,}["']
+  - id: shell-true-subprocess
+    languages: [python]
+    severity: ERROR
+    message: subprocess call with shell=True can allow shell injection.
+    pattern: subprocess.$FUNC(..., shell=True, ...)
+  - id: eval-usage
+    languages: [python, javascript, typescript]
+    severity: WARNING
+    message: Use of eval() on dynamic input can lead to code injection.
+    pattern: eval(...)

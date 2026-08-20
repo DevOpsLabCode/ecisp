@@ -52,3 +52,49 @@ class BatchSummary(BaseModel):
 class BatchDetail(BatchSummary):
     jobs: list[JobSummary]
     errors: list[RowError]
+
+
+class OrgScanCreateRequest(BaseModel):
+    org: str
+    github_token: str
+    notify_email: str | None = None
+    create_issues: bool = True
+    max_workers: int = 4
+    include_archived: bool = False
+
+
+class OrgScanSummary(BaseModel):
+    id: str
+    org: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    error: str | None = None
+    total_repos: int
+    completed_repos: int
+    repos_with_findings: int
+    severity_totals: dict[str, int]
+    issues_created: int
+    email_sent: bool
+
+
+class IssueOutcome(BaseModel):
+    action: str
+    issue_url: str | None = None
+    error: str | None = None
+
+
+class RepoScanSummary(BaseModel):
+    repository: str
+    technologies: list[str]
+    scanners_run: list[str]
+    scanners_skipped: dict[str, str]
+    severity_counts: dict[str, int]
+    finding_count: int
+    error: str | None = None
+    issue: IssueOutcome | None = None
+
+
+class OrgScanDetail(OrgScanSummary):
+    repositories: list[RepoScanSummary]

@@ -2,14 +2,25 @@ import os
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from . import engine_runner
 from .batch_import import RowParseError, csv_template_text
 from .batches import batch_manager
 from .jobs import REPORT_DIR, manager
+from .orgscan.github_client import GitHubAuthError, GitHubClient
+from .orgscan.org_scan_job import manager as org_scan_manager
 from .providers_meta import list_providers
-from .schemas import BatchDetail, BatchSummary, JobDetail, JobSummary, ScanCreateRequest
+from .schemas import (
+    BatchDetail,
+    BatchSummary,
+    JobDetail,
+    JobSummary,
+    OrgScanCreateRequest,
+    OrgScanDetail,
+    OrgScanSummary,
+    ScanCreateRequest,
+)
 
 app = FastAPI(
     title="ecisp-ui",
@@ -133,3 +144,77 @@ def get_batch(batch_id: str):
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
     return batch.detail()
+
+
+# ---------------------------------------------------------------------
+# Org-wide GitHub security scanning (SAST across every repo in an org)
+# ---------------------------------------------------------------------
+@app.post("/api/org-scans", response_model=OrgScanSummary)
+def create_org_scan(req: OrgScanCreateRequest):
+    # Verified synchronously (not left to the async worker) so a bad/expired
+    # token fails the request immediately with a clear 400, instead of
+    # silently failing a scan the user has already navigated away from.
+    try:
+        with GitHubClient(req.github_token) as gh:
+            gh.verify()
+    except GitHubAuthError as exc:
+        # Constructing GitHubClient itself raises GitHubAuthError for a
+        # blank token, not just verify() for a rejected one -- both need to
+        # land here as a clean 400, not escape the `with` block as an
+        # unhandled 500 (reproduced by POSTing an empty github_token).
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    scan = org_scan_manager.create(
+        org=req.org,
+        token=req.github_token,
+        notify_email=req.notify_email,
+        create_issues=req.create_issues,
+        max_workers=req.max_workers,
+        include_archived=req.include_archived,
+    )
+    return scan.summary()
+
+
+@app.get("/api/org-scans", response_model=list[OrgScanSummary])
+def list_org_scans():
+    return [scan.summary() for scan in org_scan_manager.list()]
+
+
+@app.get("/api/org-scans/{scan_id}", response_model=OrgScanDetail)
+def get_org_scan(scan_id: str):
+    scan = org_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Org scan not found")
+    return scan.detail()
+
+
+_REPORT_MEDIA_TYPES = {
+    "sarif": "application/sarif+json",
+    "json": "application/json",
+    "csv": "text/csv",
+    "html": "text/html",
+    "pdf": "application/pdf",
+}
+_REPORT_FILENAMES = {
+    "sarif": "security-findings.sarif",
+    "json": "security-findings.json",
+    "csv": "security-findings.csv",
+    "html": "security-report.html",
+    "pdf": "security-report.pdf",
+}
+
+
+@app.get("/api/org-scans/{scan_id}/report.{fmt}")
+def get_org_scan_report(scan_id: str, fmt: str):
+    scan = org_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Org scan not found")
+    if scan.status != "completed":
+        raise HTTPException(status_code=409, detail=f"Scan is {scan.status}, not completed")
+    if fmt not in _REPORT_FILENAMES:
+        raise HTTPException(status_code=404, detail=f"Unknown report format '{fmt}'")
+
+    path = scan._report_dir() / _REPORT_FILENAMES[fmt]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{fmt} report not available for this scan")
+    return FileResponse(path, media_type=_REPORT_MEDIA_TYPES[fmt], filename=_REPORT_FILENAMES[fmt])
