@@ -1,7 +1,7 @@
 # Web layer
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-pydantic==2.10.3
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+pydantic==2.13.4
 
 # The scan engine itself, installed editable from the repo root (two levels up).
 # Requires Python 3.9-3.11 -- see ../../README.md#requirements.
