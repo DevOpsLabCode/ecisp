@@ -1,10 +1,14 @@
 from app.orgscan import tech_detect
 
 
+def test_trivy_always_detected_regardless_of_content(tmp_path):
+    assert tech_detect.detect(tmp_path) == ["trivy"]
+
+
 def test_detects_python_via_requirements_txt(tmp_path):
     (tmp_path / "requirements.txt").write_text("flask\n")
     (tmp_path / "app.py").write_text("print('hi')\n")
-    assert tech_detect.detect(tmp_path) == ["bandit", "semgrep"]
+    assert tech_detect.detect(tmp_path) == ["bandit", "semgrep", "trivy"]
 
 
 def test_detects_bandit_from_bare_py_file_without_manifest(tmp_path):
@@ -64,9 +68,12 @@ def test_detects_security_code_scan_from_csproj(tmp_path):
     assert "security_code_scan" in tech_detect.detect(tmp_path)
 
 
-def test_empty_repo_detects_nothing(tmp_path):
+def test_empty_repo_only_detects_trivy(tmp_path):
+    # SCA/secrets scanning applies regardless of language -- trivy is the
+    # one scanner with no indicator-file gate, see tech_detect.detect()'s
+    # comment on it.
     (tmp_path / "README.md").write_text("hello\n")
-    assert tech_detect.detect(tmp_path) == []
+    assert tech_detect.detect(tmp_path) == ["trivy"]
 
 
 def test_ignores_vendored_and_git_directories(tmp_path):
@@ -76,7 +83,7 @@ def test_ignores_vendored_and_git_directories(tmp_path):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
     (git_dir / "config").write_text("[core]\n")
-    assert tech_detect.detect(tmp_path) == []
+    assert tech_detect.detect(tmp_path) == ["trivy"]
 
 
 def test_max_depth_limits_the_walk(tmp_path):
@@ -85,4 +92,4 @@ def test_max_depth_limits_the_walk(tmp_path):
         deep = deep / f"level{i}"
     deep.mkdir(parents=True)
     (deep / "requirements.txt").write_text("flask\n")
-    assert tech_detect.detect(tmp_path) == []
+    assert tech_detect.detect(tmp_path) == ["trivy"]  # too deep to be found by anything else

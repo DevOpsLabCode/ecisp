@@ -1,12 +1,15 @@
-"""Thin GitHub REST API client (PAT auth) plus a `git clone` helper.
+"""Thin GitHub REST API client (PAT or OAuth bearer token, or anonymous for
+public repos) plus a `git clone` helper.
 
 Deliberately not PyGithub -- org/repo discovery, issue search, and issue
 creation are three simple REST calls, and a raw `httpx` client keeps the
 dependency footprint small and every request's shape explicit.
 """
+
 from __future__ import annotations
 
-import subprocess  # nosec B404 -- used only for a fixed `git clone` invocation, see clone() below
+import re
+import subprocess  # nosec B404 -- used only for fixed `git` invocations, see clone()/commit_sha() below
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -20,19 +23,39 @@ _HEADERS_TEMPLATE = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
+_REPO_URL_RE = re.compile(
+    r"^(?:(?:https?://)?(?:www\.)?|git@)github\.com[/:]([^/\s]+)/([^/\s#?]+?)(?:\.git)?/?(?:[/#?].*)?$"
+)
+
 
 class GitHubAuthError(Exception):
-    """The PAT is missing, malformed, or rejected by GitHub."""
+    """The token is missing (for an operation that needs one), malformed, or rejected by GitHub."""
+
+
+def parse_repo_url(url: str) -> tuple[str, str]:
+    """Parses `owner/repo` out of any of the URL shapes a user might paste:
+    `https://github.com/owner/repo`, with or without `.git`, a trailing
+    slash, or extra path segments (`/tree/branch`, `/blob/...`)."""
+    match = _REPO_URL_RE.match(url.strip())
+    if not match:
+        raise ValueError(f"Not a recognizable GitHub repository URL: {url!r}")
+    return match.group(1), match.group(2)
 
 
 class GitHubClient:
-    def __init__(self, token: str, timeout: float = 30.0, transport: httpx.BaseTransport | None = None):
-        if not token or not token.strip():
-            raise GitHubAuthError("A GitHub personal access token is required")
-        self._token = token.strip()
+    def __init__(self, token: str | None, timeout: float = 30.0, transport: httpx.BaseTransport | None = None):
+        # A token is only required for private-repo/write operations --
+        # public-repo discovery, branch listing, and cloning all work
+        # unauthenticated (subject to GitHub's lower anonymous rate limit),
+        # which is exactly what use case 1's "public repo: scan directly,
+        # no auth" requirement needs.
+        self._token = (token or "").strip() or None
+        headers = dict(_HEADERS_TEMPLATE)
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
         self._client = httpx.Client(
             base_url=API_BASE,
-            headers={**_HEADERS_TEMPLATE, "Authorization": f"Bearer {self._token}"},
+            headers=headers,
             timeout=timeout,
             transport=transport,  # None uses httpx's real network transport; tests inject a MockTransport
         )
@@ -47,7 +70,9 @@ class GitHubClient:
         self.close()
 
     def verify(self) -> dict:
-        """Confirms the PAT is valid and returns the authenticated user."""
+        """Confirms the token is valid and returns the authenticated user."""
+        if not self._token:
+            raise GitHubAuthError("No token to verify -- this client was constructed for anonymous access")
         resp = self._client.get("/user")
         if resp.status_code == 401:
             raise GitHubAuthError("GitHub rejected this token (401 Unauthorized) -- check it hasn't expired")
@@ -88,6 +113,18 @@ class GitHubClient:
             repos = [r for r in repos if not r.get("archived")]
         return repos
 
+    def get_repo(self, owner: str, repo: str) -> dict:
+        """Repo metadata -- notably `private` (whether this client's token,
+        if any, needs read access) and `default_branch`."""
+        resp = self._client.get(f"/repos/{owner}/{repo}")
+        if resp.status_code == 404:
+            raise GitHubAuthError(f"{owner}/{repo} not found (or private and this token can't see it)")
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_branches(self, owner: str, repo: str) -> list[str]:
+        return [b["name"] for b in self._paginated(f"/repos/{owner}/{repo}/branches")]
+
     def find_open_issue_by_title(self, owner: str, repo: str, title: str) -> dict | None:
         for issue in self._paginated(
             f"/repos/{owner}/{repo}/issues",
@@ -107,9 +144,14 @@ class GitHubClient:
 
     @contextmanager
     def clone(self, owner: str, repo: str, default_branch: str | None = None):
-        """Shallow-clones a repo into a temp dir using the PAT for auth,
-        yielding the path, and always cleans up on exit."""
-        clone_url = f"https://x-access-token:{self._token}@github.com/{owner}/{repo}.git"
+        """Shallow-clones a repo into a temp dir, yielding the path and
+        always cleaning up on exit. Uses the token for auth when this
+        client has one; a public repo clones anonymously over plain
+        https, no credentials embedded in the URL at all."""
+        if self._token:
+            clone_url = f"https://x-access-token:{self._token}@github.com/{owner}/{repo}.git"
+        else:
+            clone_url = f"https://github.com/{owner}/{repo}.git"
         with tempfile.TemporaryDirectory(prefix="orgscan-") as tmp_dir:
             dest = Path(tmp_dir) / repo
             args = ["git", "clone", "--depth", "1", "--single-branch"]
@@ -120,9 +162,10 @@ class GitHubClient:
             # interpolated into argv entries, never shell-interpreted.
             proc = subprocess.run(args, capture_output=True, text=True, timeout=300, check=False)  # nosec B603
             if proc.returncode != 0:
-                # The PAT is embedded in clone_url -- never let it leak into an
-                # exception message that might end up in a log or the UI.
-                safe_stderr = proc.stderr.replace(self._token, "<redacted>")
+                # The token is embedded in clone_url when present -- never
+                # let it leak into an exception message that might end up
+                # in a log or the UI.
+                safe_stderr = proc.stderr.replace(self._token, "<redacted>") if self._token else proc.stderr
                 raise RuntimeError(f"git clone failed for {owner}/{repo}: {safe_stderr[-1000:]}")
             # .resolve() matters on macOS: tempfile.TemporaryDirectory()
             # gives a /var/... path that's actually a symlink to
@@ -132,3 +175,16 @@ class GitHubClient:
             # os.path.relpath() downstream compute a bogus, symlink-crossing
             # "relative" path instead of the repo-relative one we want.
             yield dest.resolve()
+
+
+def commit_sha(repo_dir: Path) -> str:
+    """The exact commit a `clone()`d directory is checked out at -- use
+    case 2 requires recording this per scan, and a `--depth 1` shallow
+    clone still has HEAD resolvable even though the rest of history isn't
+    fetched."""
+    proc = subprocess.run(  # nosec B603 B607 -- fixed git invocation against our own clone, no shell
+        ["git", "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True, timeout=30, check=False
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"git rev-parse HEAD failed: {proc.stderr[-500:]}")
+    return proc.stdout.strip()
