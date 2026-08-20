@@ -17,7 +17,12 @@ from .scanners import REGISTRY
 from .scanners.base import ScannerExecutionError, ScannerUnavailable
 
 
-def scan_repo(repo_dir: Path, repository: str, only_scanners: set[str] | None = None) -> RepoScanResult:
+def scan_repo(
+    repo_dir: Path,
+    repository: str,
+    only_scanners: set[str] | None = None,
+    exclude_scanners: dict[str, str] | None = None,
+) -> RepoScanResult:
     # See github_client.clone()'s comment -- scanner subprocesses report
     # physical paths, so relative-path computation needs to start from a
     # symlink-resolved base too, not just here for /var on macOS.
@@ -29,7 +34,14 @@ def scan_repo(repo_dir: Path, repository: str, only_scanners: set[str] | None = 
 
     all_findings: list[Finding] = []
     scanners_run: list[str] = []
-    scanners_skipped: dict[str, str] = {}
+    # `exclude_scanners` maps scanner id -> the reason it's excluded (e.g.
+    # code_scan_job.py disables SpotBugs/Security Code Scan for uploaded
+    # archives specifically, since both compile the target -- running
+    # untrusted build tooling -- which a cloned repo's scan doesn't need to
+    # rule out). Recorded as a skip with that reason rather than silently
+    # dropped, same as any other skip.
+    scanners_skipped: dict[str, str] = dict(exclude_scanners or {})
+    applicable = [s for s in applicable if s not in scanners_skipped]
 
     for scanner_id in applicable:
         module = REGISTRY[scanner_id]

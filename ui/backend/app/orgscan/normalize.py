@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -83,7 +84,15 @@ def parse_sarif(
     category: str,
     remediation_hint: str | None = None,
     base_dir: Path | None = None,
+    category_fn: Callable[[dict, dict], str] | None = None,
 ) -> list[Finding]:
+    """`category_fn`, when given, overrides `category` per-result -- e.g.
+    Trivy's filesystem scan mixes SCA (vulnerability) and secret findings in
+    one SARIF run, distinguished only by `rule.properties.tags` containing
+    "secret" (verified against a real trivy run; see
+    scanners/trivy_sca_secrets.py), not by anything at the top level a
+    single fixed `category` could express.
+    """
     doc = json.loads(sarif_text)
     findings: list[Finding] = []
     for run in doc.get("runs", []):
@@ -120,7 +129,7 @@ def parse_sarif(
                     scanner=scanner,
                     rule_id=rule_id.rsplit(".", 1)[-1] if "." in rule_id and "/" not in rule_id else rule_id,
                     severity=severity,
-                    category=category,
+                    category=category_fn(result, rule) if category_fn else category,
                     message=_message_text(result.get("message")) or rule_id,
                     remediation=remediation_hint,
                 )

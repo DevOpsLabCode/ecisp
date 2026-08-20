@@ -74,3 +74,8 @@ report-*
 *.prof
 
 !docker/bin
+
+# Local env files (secrets, e.g. GitHub OAuth client secret) -- never commit
+.env
+.env.*
+!.env.example

@@ -38,11 +38,12 @@ jobs:
     name: Build, bring online, test, publish
     runs-on: ubuntu-latest
     # The backend image now bundles five language toolchains (Python, Go,
-    # JVM+Maven, Ruby, .NET SDK) for app/orgscan/'s eight SAST scanners, on
-    # top of the app itself -- a cold build (no layer cache, e.g. after a
-    # Dockerfile change) takes noticeably longer than the old Python-only
-    # image did. 20 minutes was cutting it close.
-    timeout-minutes: 35
+    # JVM+Maven, Ruby, .NET SDK) for app/orgscan/'s eight SAST scanners,
+    # plus Trivy and OWASP ZAP for the code-scan feature, on top of the app
+    # itself -- a cold build (no layer cache, e.g. after a Dockerfile
+    # change) takes noticeably longer than the old Python-only image did.
+    # 20 minutes was cutting it close even before ZAP's ~130MB download.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
@@ -112,6 +113,46 @@ jobs:
           echo "$detail" | python3 -m json.tool
           echo "$detail" > /tmp/scan_detail.json
           python3 ui/perf/assert_scan_ran.py /tmp/scan_detail.json
+
+      - name: Smoke test a real code-scan upload through the pipeline
+        # Exercises the archive-upload SAST/SCA/Secrets pipeline end to end
+        # against the live container -- not mocked, so this is the one place
+        # CI actually runs Trivy (and whichever other scanners tech_detect
+        # matches) for real, against a real .zip.
+        run: |
+          set -e
+          python3 -c "
+          import zipfile
+          with zipfile.ZipFile('/tmp/smoke.zip', 'w') as zf:
+              zf.writestr('smoke-proj/requirements.txt', 'flask==0.12\n')
+              zf.writestr('smoke-proj/app.py', 'print(\"hello\")\n')
+          "
+          scan_id=$(curl -sf -X POST http://localhost:8000/api/code-scans/upload \
+            -F "file=@/tmp/smoke.zip;type=application/zip" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          for _ in $(seq 1 60); do
+            status=$(curl -sf "http://localhost:8000/api/code-scans/$scan_id" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
+            [ "$status" = "completed" ] || [ "$status" = "failed" ] && break
+            sleep 1
+          done
+          detail=$(curl -sf "http://localhost:8000/api/code-scans/$scan_id")
+          echo "$detail" | python3 -m json.tool
+          echo "$detail" > /tmp/code_scan_detail.json
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/code_scan_detail.json'))
+          assert d['status'] == 'completed', f\"expected completed, got {d['status']!r}: {d.get('error')}\"
+          assert d['source_type'] == 'upload'
+          assert 'trivy' in d['scanners_run'] or 'trivy' in d['scanners_skipped'], 'trivy did not run or record a skip reason'
+          print('code-scan upload smoke test passed:', d['finding_count'], 'findings')
+          "
+          curl -sf "http://localhost:8000/api/code-scans/$scan_id/report.sarif" -o /tmp/code_scan_report.sarif
+          python3 -c "
+          import json
+          report = json.load(open('/tmp/code_scan_report.sarif'))
+          assert report['runs'], 'SARIF report has no runs'
+          print('report.sarif downloaded and parses as valid SARIF')
+          "
 
       - name: Smoke test frontend
         run: |

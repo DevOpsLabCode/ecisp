@@ -1,19 +1,28 @@
 import os
+import uuid
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 
 from . import engine_runner
 from .batch_import import RowParseError, csv_template_text
 from .batches import batch_manager
+from .codescan import github_oauth
+from .codescan.code_scan_job import UPLOAD_DIR
+from .codescan.code_scan_job import manager as code_scan_manager
+from .codescan.github_oauth import OAuthError, OAuthNotConfigured
 from .jobs import REPORT_DIR, manager
-from .orgscan.github_client import GitHubAuthError, GitHubClient
+from .orgscan.github_client import GitHubAuthError, GitHubClient, parse_repo_url
 from .orgscan.org_scan_job import manager as org_scan_manager
 from .providers_meta import list_providers
 from .schemas import (
     BatchDetail,
     BatchSummary,
+    CodeScanDetail,
+    CodeScanFromRepoRequest,
+    CodeScanSummary,
+    DastRequest,
     JobDetail,
     JobSummary,
     OrgScanCreateRequest,
@@ -36,6 +45,12 @@ app = FastAPI(
 # port), or every request will fail CORS preflight with no server-side
 # error to point at, same as it did before this was configurable.
 DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080"
+
+# Where the OAuth callback sends the browser back to, and what redirect_uri
+# this backend registers with GitHub -- both need to be reachable exactly
+# as configured, matching the OAuth App's own "Authorization callback URL".
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8080")
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 
 def parse_cors_origins(raw: str) -> list[str]:
@@ -209,6 +224,171 @@ def get_org_scan_report(scan_id: str, fmt: str):
     scan = org_scan_manager.get(scan_id)
     if not scan:
         raise HTTPException(status_code=404, detail="Org scan not found")
+    if scan.status != "completed":
+        raise HTTPException(status_code=409, detail=f"Scan is {scan.status}, not completed")
+    if fmt not in _REPORT_FILENAMES:
+        raise HTTPException(status_code=404, detail=f"Unknown report format '{fmt}'")
+
+    path = scan._report_dir() / _REPORT_FILENAMES[fmt]
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{fmt} report not available for this scan")
+    return FileResponse(path, media_type=_REPORT_MEDIA_TYPES[fmt], filename=_REPORT_FILENAMES[fmt])
+
+
+# ---------------------------------------------------------------------
+# GitHub OAuth ("Connect GitHub" for private repos in the code-scan flow)
+# ---------------------------------------------------------------------
+_OAUTH_CALLBACK_URL = f"{BACKEND_URL}/api/github/oauth/callback"
+
+
+@app.get("/api/github/oauth/login")
+def github_oauth_login():
+    try:
+        state = github_oauth.oauth_states.create("pending")
+        url = github_oauth.build_authorize_url(_OAUTH_CALLBACK_URL, state)
+    except OAuthNotConfigured as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return RedirectResponse(url)
+
+
+@app.get("/api/github/oauth/callback")
+def github_oauth_callback(code: str, state: str):
+    if github_oauth.oauth_states.pop(state) is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+    try:
+        token = github_oauth.exchange_code(code, _OAUTH_CALLBACK_URL)
+    except (OAuthNotConfigured, OAuthError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    session_id = github_oauth.oauth_sessions.create(token)
+    # The redirect target is a plain "it worked" signal for the UI to pick
+    # up (e.g. close a popup, flip a connected indicator) -- the token
+    # itself never appears in a URL, only in the httponly cookie below.
+    response = RedirectResponse(f"{FRONTEND_URL}/code-scan?github_connected=1")
+    response.set_cookie(
+        github_oauth.SESSION_COOKIE_NAME,
+        session_id,
+        httponly=True,
+        samesite="lax",
+        max_age=github_oauth.SESSION_TTL_SECONDS,
+    )
+    return response
+
+
+@app.get("/api/github/oauth/status")
+def github_oauth_status(request: Request):
+    session_id = request.cookies.get(github_oauth.SESSION_COOKIE_NAME)
+    token = github_oauth.oauth_sessions.get(session_id) if session_id else None
+    return {"connected": token is not None, "configured": github_oauth.is_configured()}
+
+
+@app.post("/api/github/oauth/logout")
+def github_oauth_logout(request: Request):
+    session_id = request.cookies.get(github_oauth.SESSION_COOKIE_NAME)
+    if session_id:
+        github_oauth.oauth_sessions.pop(session_id)
+    response = RedirectResponse(f"{FRONTEND_URL}/code-scan")
+    response.delete_cookie(github_oauth.SESSION_COOKIE_NAME)
+    return response
+
+
+def _session_github_token(request: Request) -> str | None:
+    session_id = request.cookies.get(github_oauth.SESSION_COOKIE_NAME)
+    return github_oauth.oauth_sessions.get(session_id) if session_id else None
+
+
+# ---------------------------------------------------------------------
+# Single-source code scanning (upload a .zip/.tar/.tar.gz, or a GitHub
+# repo URL) through the same SAST/SCA/Secrets/IaC pipeline as org scans,
+# plus an optional DAST follow-up against an authorized running app URL.
+# ---------------------------------------------------------------------
+# 200MB comfortably covers a real project's source tree (excluding
+# dependencies/build output, which a reasonable .gitignore/.dockerignore-
+# style upload wouldn't include anyway) without allowing unbounded abuse;
+# archive_extract.py enforces its own, separate caps on the *extracted*
+# content regardless of what this allows in compressed.
+MAX_CODE_UPLOAD_BYTES = 200 * 1024 * 1024
+
+
+@app.post("/api/code-scans/upload", response_model=CodeScanSummary)
+async def create_code_scan_from_upload(file: UploadFile = File(...)):  # noqa: B008
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(data) > MAX_CODE_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413, detail=f"Uploaded file exceeds the {MAX_CODE_UPLOAD_BYTES // (1024 * 1024)}MB limit"
+        )
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    archive_path = UPLOAD_DIR / f"{uuid.uuid4().hex}-{file.filename or 'upload'}"
+    archive_path.write_bytes(data)
+
+    scan = code_scan_manager.create_from_upload(archive_path, file.filename or "upload")
+    return scan.summary()
+
+
+@app.get("/api/code-scans/branches")
+def list_code_scan_branches(repo_url: str, request: Request):
+    try:
+        owner, repo = parse_repo_url(repo_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    token = _session_github_token(request)
+    with GitHubClient(token) as gh:
+        try:
+            info = gh.get_repo(owner, repo)
+            branches = gh.list_branches(owner, repo)
+        except GitHubAuthError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"private": info.get("private", False), "default_branch": info.get("default_branch"), "branches": branches}
+
+
+@app.post("/api/code-scans/repo", response_model=CodeScanSummary)
+def create_code_scan_from_repo(req: CodeScanFromRepoRequest, request: Request):
+    try:
+        parse_repo_url(req.repo_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    token = _session_github_token(request)
+    scan = code_scan_manager.create_from_repo_url(req.repo_url, req.branch, github_token=token)
+    return scan.summary()
+
+
+@app.get("/api/code-scans", response_model=list[CodeScanSummary])
+def list_code_scans():
+    return [scan.summary() for scan in code_scan_manager.list()]
+
+
+@app.get("/api/code-scans/{scan_id}", response_model=CodeScanDetail)
+def get_code_scan(scan_id: str):
+    scan = code_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Code scan not found")
+    return scan.detail()
+
+
+@app.post("/api/code-scans/{scan_id}/dast", response_model=CodeScanSummary)
+def create_code_scan_dast(scan_id: str, req: DastRequest):
+    scan = code_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Code scan not found")
+    if scan.status != "completed":
+        raise HTTPException(status_code=409, detail=f"Source scan is {scan.status}, not completed yet")
+    if scan.dast_status == "running":
+        raise HTTPException(status_code=409, detail="A DAST scan is already running for this code scan")
+
+    scan = code_scan_manager.add_dast(scan_id, req.target_url, req.spider_minutes, req.active_scan_minutes)
+    return scan.summary()
+
+
+@app.get("/api/code-scans/{scan_id}/report.{fmt}")
+def get_code_scan_report(scan_id: str, fmt: str):
+    scan = code_scan_manager.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Code scan not found")
     if scan.status != "completed":
         raise HTTPException(status_code=409, detail=f"Scan is {scan.status}, not completed")
     if fmt not in _REPORT_FILENAMES:
