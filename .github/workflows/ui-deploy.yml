@@ -37,7 +37,12 @@ jobs:
   build-test-publish:
     name: Build, bring online, test, publish
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The backend image now bundles five language toolchains (Python, Go,
+    # JVM+Maven, Ruby, .NET SDK) for app/orgscan/'s eight SAST scanners, on
+    # top of the app itself -- a cold build (no layer cache, e.g. after a
+    # Dockerfile change) takes noticeably longer than the old Python-only
+    # image did. 20 minutes was cutting it close.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
 

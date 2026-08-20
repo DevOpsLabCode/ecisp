@@ -36,6 +36,54 @@ Two ways, matched to what the engine actually supports natively:
   `EnterpriseCloudDiscovery/providers/aws/authentication_strategy.py`,
   which just does `boto3.Session(profile_name=profile)`.
 
+## Org-wide GitHub security scanning (SAST)
+
+Separate from the cloud provider scanning above: `New org scan` discovers
+every repository in a GitHub organization or personal account (given a PAT),
+clones each one, and runs whichever of eight SAST scanners actually apply to
+what it finds in that repo:
+
+| Scanner | Covers | Detected via |
+|---|---|---|
+| Checkov | Terraform, CloudFormation, Kubernetes, Dockerfiles | `.tf`, `Dockerfile`, IaC-shaped YAML |
+| Bandit | Python | `.py` files / `requirements.txt` / `pyproject.toml` |
+| Semgrep | Multi-language (bundled ruleset, see below) | any recognized source file |
+| Gosec | Go | `go.mod` |
+| SpotBugs | Java (compiles via Maven/Gradle first) | `pom.xml` / `build.gradle` |
+| ESLint + eslint-plugin-security | JS/TS | `.js`/`.ts` files / `package.json` |
+| Brakeman | Ruby on Rails | `Gemfile` / `config/application.rb` |
+| Security Code Scan | .NET (via `dotnet build`) | `.csproj` / `.sln` |
+
+Findings are deduplicated (same repo/file/rule/line collapses to one,
+scanner attribution merges), and every scan produces all five report formats
+— SARIF, JSON, CSV, HTML, PDF — downloadable from the scan detail page.
+Critical/High findings can optionally open a grouped GitHub Issue per
+repository (re-running the same day reuses the existing issue rather than
+duplicating it); everything else always shows up in the reports regardless.
+An optional notify email gets the summary + all five reports attached once
+the scan finishes (configure `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/
+`SMTP_PASSWORD`/`SMTP_FROM`/`SMTP_USE_TLS` on the backend; without them the
+scan still runs and reports are still downloadable, the email step is just
+skipped).
+
+The PAT is used once for that scan and is never persisted. See
+`ui/backend/app/orgscan/` — `github_client.py` (discovery/clone/issues,
+works against both real GitHub Organizations and personal accounts),
+`tech_detect.py` (which scanners apply to a given repo),
+`repo_scanner.py`/`org_scan_job.py` (orchestration), `normalize.py` (the
+shared SARIF→Finding conversion five of the eight scanners go through), and
+`scanners/` (one adapter module per tool). Semgrep runs against a small
+bundled ruleset (`orgscan/rulesets/semgrep-default.yml`) rather than
+`--config auto`, deliberately avoiding a hard runtime dependency on the
+Semgrep Registry being reachable; override with the `SEMGREP_CONFIG` env var.
+
+This needs the full scanner toolchain (Go, JVM+Maven, Ruby, .NET SDK,
+Node+ESLint) that only the Docker image installs — running the backend
+directly with `uvicorn` (see below) will report every scanner as "not
+installed" and just skip them for every repo, which is still safe (a scan
+completes with empty results) but not useful. Use the Docker image, or
+`ui/scripts/test-all.sh --docker`, to actually exercise this feature.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —
@@ -228,3 +276,13 @@ gh run watch <run-id> --exit-status   # live tail of a specific run
 - **SQLite result format isn't wired up** — the UI always requests
   `result_format=json` since that's what it reads back. The engine's
   experimental SQLite/`--serve` path isn't exposed here.
+- **Org-scan reports directory**: written to `ui/backend/data/orgscan-reports`,
+  same "nothing prunes it, manage retention yourself" caveat as above. Not
+  currently mounted as a named volume in `docker-compose.yml` (the cloud-scan
+  `reports` volume is), so org-scan reports don't survive a container
+  recreate — fine for local use, worth fixing before relying on it in a real
+  deployment.
+- **One org scan at a time, fanned out internally**: same single-worker-queue
+  shape as cloud scans, for the same reason (process-global state) — but each
+  org scan clones/scans its own repos concurrently via a thread pool
+  (`max_workers`), so this isn't as serial as it sounds for a single scan.

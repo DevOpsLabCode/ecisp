@@ -3,6 +3,9 @@ import type {
   BatchSummary,
   JobDetail,
   JobSummary,
+  OrgScanCreateRequest,
+  OrgScanDetail,
+  OrgScanSummary,
   ProviderMeta,
   ScanCreateRequest,
   ScanResults,
@@ -54,4 +57,11 @@ export const api = {
   listBatches: () => request<BatchSummary[]>("/api/batches"),
   getBatch: (id: string) => request<BatchDetail>(`/api/batches/${id}`),
   batchTemplateUrl: () => `${BASE_URL}/api/batches/template.csv`,
+
+  createOrgScan: (body: OrgScanCreateRequest) =>
+    request<OrgScanSummary>("/api/org-scans", { method: "POST", body: JSON.stringify(body) }),
+  listOrgScans: () => request<OrgScanSummary[]>("/api/org-scans"),
+  getOrgScan: (id: string) => request<OrgScanDetail>(`/api/org-scans/${id}`),
+  orgScanReportUrl: (id: string, fmt: "sarif" | "json" | "csv" | "html" | "pdf") =>
+    `${BASE_URL}/api/org-scans/${id}/report.${fmt}`,
 };
