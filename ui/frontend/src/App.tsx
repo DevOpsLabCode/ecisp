@@ -5,7 +5,10 @@ import Batches from "./pages/Batches";
 import BulkImport from "./pages/BulkImport";
 import JobDetail from "./pages/JobDetail";
 import Jobs from "./pages/Jobs";
+import NewOrgScan from "./pages/NewOrgScan";
 import NewScan from "./pages/NewScan";
+import OrgScanDetail from "./pages/OrgScanDetail";
+import OrgScans from "./pages/OrgScans";
 
 function App() {
   return (
@@ -18,6 +21,9 @@ function App() {
           <Route path="/bulk-import" element={<BulkImport />} />
           <Route path="/batches" element={<Batches />} />
           <Route path="/batches/:id" element={<BatchDetail />} />
+          <Route path="/org-scans/new" element={<NewOrgScan />} />
+          <Route path="/org-scans" element={<OrgScans />} />
+          <Route path="/org-scans/:id" element={<OrgScanDetail />} />
         </Routes>
       </Layout>
     </BrowserRouter>

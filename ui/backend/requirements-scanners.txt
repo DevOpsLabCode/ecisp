@@ -1,0 +1,12 @@
+# CLI security scanners the org-scan feature (app/orgscan/) shells out to.
+# Installed into a SEPARATE venv from the FastAPI app (see Dockerfile) --
+# checkov/semgrep/bandit each carry their own large, fast-moving dependency
+# trees (pydantic, click, etc.) that would otherwise fight the app's own
+# pinned versions in requirements-web.txt.
+#
+# Versions pinned to what was actually verified locally against real
+# fixtures -- see the docstrings in app/orgscan/scanners/*.py.
+checkov==3.3.12
+bandit==1.9.4
+bandit-sarif-formatter==1.1.1
+semgrep==1.173.0
