@@ -249,7 +249,7 @@ benign syscalls matching real Falco rules tagged with real MITRE ATT&CK
 technique IDs (credential access, defense evasion, persistence, and
 more); everything it touches is confined to that one pod's own
 filesystem, and the pod deletes itself the instant it finishes. No
-install token is involved — the script never talks to ECISP directly, it
+install token is involved — the script never talks to Golem directly, it
 only triggers syscalls that the cluster's already-deployed Falco sensor
 picks up and reports through the webhook path that's already configured.
 

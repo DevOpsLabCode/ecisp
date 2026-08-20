@@ -9,7 +9,7 @@ minute of running one command, rather than waiting for a real incident or
 staging one by hand the way this feature itself was verified below.
 
 No install token is embedded here, unlike install_script.py: this script
-never talks to ECISP directly. It only triggers real syscalls inside the
+never talks to Golem directly. It only triggers real syscalls inside the
 target cluster; the Falco sensor already deployed there (via the install
 script) observes them and reports through the webhook that's already
 configured for this cluster -- the exact same path a real incident takes.
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 _SIMULATION_SCRIPT_TEMPLATE = """\
 #!/usr/bin/env bash
-# ECISP Runtime Defender attack simulation for cluster: {cluster_name}
+# Golem Defender attack simulation for cluster: {cluster_name}
 #
 # Runs falcosecurity/event-generator's default action set as a disposable
 # pod against whichever cluster your current `kubectl` context points at --
@@ -54,7 +54,7 @@ kubectl run "$POD_NAME" \\
   -- run --loop=false
 
 echo
-echo "Done. Check '{cluster_name}' in Golem Defender -- alerts for these actions should already be showing up."
+echo "Done. Check '{cluster_name}' in Runtime Protection -- alerts should already be showing up."
 """
 
 

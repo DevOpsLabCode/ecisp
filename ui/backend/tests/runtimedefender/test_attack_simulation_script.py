@@ -24,7 +24,7 @@ def test_build_simulation_script_cleans_up_after_itself():
 
 
 def test_build_simulation_script_embeds_no_install_token():
-    # Unlike install_script.py, this script never talks to ECISP directly --
+    # Unlike install_script.py, this script never talks to Golem directly --
     # it only triggers syscalls the already-deployed Falco sensor observes.
     script = build_simulation_script("prod-eks")
     assert "token" not in script.lower()
