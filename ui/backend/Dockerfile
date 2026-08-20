@@ -16,7 +16,7 @@
 # ZAP (DAST, app/codescan/dast_scanner.py) for the code-scan feature.
 
 # --- app: the FastAPI web layer's own venv ---
-FROM python:3.11-slim AS app-builder
+FROM python:3.14-slim AS app-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir -r ui/backend/requirements-web.txt
 # separate from the app's venv above -- these are substantial applications
 # in their own right with fast-moving dependency trees (pydantic, click,
 # ...) that would otherwise fight the app's own pinned versions. ---
-FROM python:3.11-slim AS scanner-venv-builder
+FROM python:3.14-slim AS scanner-venv-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
@@ -111,7 +111,7 @@ RUN npm init -y >/dev/null \
 # to actually execute (JDK for spotbugs, Ruby for brakeman, .NET SDK for
 # security code scan, Go's runtime is statically linked into gosec so it
 # does not need its own install here). ---
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
