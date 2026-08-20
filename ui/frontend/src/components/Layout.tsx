@@ -33,6 +33,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <NavLink to="/org-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
           Org scan history
         </NavLink>
+        <div className="nav-section-label">Code Security</div>
+        <NavLink to="/code-scan" className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          New code scan
+        </NavLink>
+        <NavLink to="/code-scans" end className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+          Code scan history
+        </NavLink>
         <div className="sidebar-footer">
           <a href="https://devopslabinc.com" target="_blank" rel="noreferrer">
             A DevOps Lab product

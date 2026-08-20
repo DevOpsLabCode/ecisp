@@ -37,6 +37,14 @@ def test_cors_headers_absent_for_unconfigured_origin():
     assert "access-control-allow-origin" not in res.headers
 
 
+def test_cors_allows_credentials_for_configured_origin():
+    # The code-scan frontend reads the GitHub OAuth session cookie via
+    # fetch(..., credentials: "include") from a different origin than this
+    # API -- without this header, the browser won't expose the response.
+    res = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
+    assert res.headers["access-control-allow-credentials"] == "true"
+
+
 def wait_for_status(job_id: str, timeout: float = 5.0) -> dict:
     deadline = time.time() + timeout
     detail = {}
