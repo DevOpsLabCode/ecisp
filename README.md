@@ -1,7 +1,7 @@
 # Enterprise Cloud Discovery Engine
 
 [![Python](https://img.shields.io/badge/Python-3.9–3.11-blue.svg)](#requirements)
-[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](#project-status)
 [![Maintainer](https://img.shields.io/badge/maintainer-DevOps%20Lab%20Inc.-informational.svg)](#maintainer-and-support)
 
@@ -328,7 +328,7 @@ Automation should treat `0` as clean success, `200` as completed-with-errors, an
 ├── setup.py                       # package metadata and console entry point
 ├── requirements.txt               # runtime dependencies
 ├── dev-requirements.txt           # development/test dependencies
-├── LICENSE                        # GPLv2 license
+├── LICENSE                        # proprietary, Copyright (c) DevOps Lab Inc.
 └── THIRD_PARTY_NOTICES.md         # upstream notices and attribution
 ```
 
@@ -1312,17 +1312,11 @@ Those capabilities belong in the broader platform unless and until corresponding
 
 ## License and attribution
 
-This repository is distributed under the **GNU General Public License version 2 (GPLv2)**. See [LICENSE](LICENSE).
+This repository is **proprietary software, Copyright (c) 2026 DevOps Lab Inc. All rights reserved.** See [LICENSE](LICENSE).
 
-The source retains upstream lineage and attribution, including NCC Group information in package metadata. DevOps Lab Inc. maintenance and branding do not remove or replace legally required copyright, license, or third-party notices.
+Portions of this codebase originated as modifications of open-source components; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for that lineage and attribution.
 
-Review and preserve:
-
-- [LICENSE](LICENSE)
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-- source-file notices and attribution
-
-Downstream redistribution or modification must comply with GPLv2 and all applicable notices. This README is not legal advice.
+This README is not legal advice.
 
 ---
 

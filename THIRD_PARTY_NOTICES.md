@@ -4,4 +4,4 @@ This component is a modified derivative of the open-source Scout Suite project o
 
 The modified component is not the original upstream product. Changes include package renaming, platform integration contracts, report rebranding, normalized evidence export, and planned orchestration interfaces.
 
-See `LICENSE` for the complete GPLv2 license text. Copyright notices in source files, where present, must be preserved.
+The original Scout Suite project's GPLv2 terms applied to the unmodified upstream code; this repository's own `LICENSE` now governs distribution of this codebase as a whole. Copyright notices in source files, where present, must be preserved.
