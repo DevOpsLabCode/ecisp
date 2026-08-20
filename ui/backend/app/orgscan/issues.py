@@ -44,7 +44,7 @@ def issue_body(result: RepoScanResult, scan_date: str) -> str:
         if f.remediation:
             lines.append(f"   - Remediation: {f.remediation}")
     lines.append("")
-    lines.append(f"<!-- ecisp-org-scan fingerprint-set: {','.join(sorted(f.fingerprint for f in qualifying))} -->")
+    lines.append(f"<!-- golem-org-scan fingerprint-set: {','.join(sorted(f.fingerprint for f in qualifying))} -->")
     return "\n".join(lines)
 
 

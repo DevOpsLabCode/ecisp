@@ -80,7 +80,7 @@ jobs:
       template: sarif-json
       reportDir: {report_path.parent}
       reportFile: {report_path.stem}
-      reportTitle: ecisp DAST scan
+      reportTitle: Golem DAST scan
 """
 
 

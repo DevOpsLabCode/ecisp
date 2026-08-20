@@ -42,7 +42,7 @@ def test_issue_body_includes_severity_counts_and_findings():
 def test_issue_body_embeds_fingerprint_marker_for_dedup():
     result = _result_with_severities("high")
     body = issue_body(result, "2026-08-19")
-    assert "ecisp-org-scan fingerprint-set:" in body
+    assert "golem-org-scan fingerprint-set:" in body
 
 
 def test_create_issues_skips_repos_with_no_qualifying_findings():

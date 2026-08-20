@@ -29,7 +29,7 @@ OAUTH_SCOPE = "repo"
 
 STATE_TTL_SECONDS = 600  # 10 minutes -- just long enough for a real login, short enough to limit CSRF exposure
 SESSION_TTL_SECONDS = 3600
-SESSION_COOKIE_NAME = "ecisp_github_session"
+SESSION_COOKIE_NAME = "golem_github_session"
 
 
 class OAuthNotConfigured(Exception):

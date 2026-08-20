@@ -26,10 +26,10 @@ from __future__ import annotations
 
 _INSTALL_SCRIPT_TEMPLATE = """\
 #!/usr/bin/env bash
-# ECISP Runtime Defender install script for cluster: {cluster_name}
+# Golem Defender install script for cluster: {cluster_name}
 #
 # Deploys the Falco eBPF sensor (DaemonSet, one pod per node) plus
-# falcosidekick, configured to report findings back to ECISP. Works
+# falcosidekick, configured to report findings back to Golem. Works
 # against EKS, AKS, GKE, OpenShift, or any standard Kubernetes cluster --
 # run this against whichever cluster your current `kubectl` context points
 # at. Read-only host-level monitoring; it detects and reports, it does not
@@ -58,8 +58,8 @@ helm upgrade --install falco falcosecurity/falco \\
   --wait --timeout 5m
 
 echo
-echo "Done. Falco is now monitoring every node in this cluster and reporting to ECISP."
-echo "View findings at: {dashboard_host} -> Runtime Defender -> {cluster_name}"
+echo "Done. Falco is now monitoring every node in this cluster and reporting to Golem."
+echo "View findings at: {dashboard_host} -> Runtime Protection -> {cluster_name}"
 """
 
 

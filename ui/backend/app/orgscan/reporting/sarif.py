@@ -50,7 +50,7 @@ def to_sarif(repo_results: list[RepoScanResult]) -> str:
             {
                 "tool": {
                     "driver": {
-                        "name": "ecisp-org-scan",
+                        "name": "golem-scan",
                         "informationUri": "https://devopslabinc.com",
                         "rules": list(rules.values()),
                     }

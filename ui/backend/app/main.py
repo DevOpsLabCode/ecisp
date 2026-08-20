@@ -44,8 +44,9 @@ from .schemas import (
 )
 
 app = FastAPI(
-    title="ecisp-ui",
-    description="Web UI for the Enterprise Cloud Discovery engine, a DevOps Lab product.",
+    title="Golem",
+    description="Golem -- built to defend what you build. A DevOps Lab Inc. product, "
+    "on the Enterprise Cloud Discovery engine.",
     version="0.1.0",
     contact={"name": "Stan Zvenigorodskiy", "url": "https://devopslabinc.com"},
 )
@@ -146,7 +147,7 @@ def batch_template():
     return PlainTextResponse(
         csv_template_text(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=ecisp-bulk-import-template.csv"},
+        headers={"Content-Disposition": "attachment; filename=golem-bulk-import-template.csv"},
     )
 
 

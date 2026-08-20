@@ -1,7 +1,7 @@
 """
 Thin integration layer between the FastAPI job manager and the actual
-EnterpriseCloudDiscovery engine (the ecisp package living at the repo root,
-two directories up from this file).
+EnterpriseCloudDiscovery engine (the `EnterpriseCloudDiscovery` package
+living at the repo root, two directories up from this file).
 
 Import of the engine is deferred and guarded: the API should still boot and
 serve provider metadata / job history even if the engine package (and its
@@ -25,9 +25,9 @@ try:
 except Exception as exc:  # pragma: no cover - depends on local environment
     ENGINE_AVAILABLE = False
     ENGINE_IMPORT_ERROR = (
-        f"{type(exc).__name__}: {exc}. The ecisp engine is not importable from this "
-        f"interpreter. Install it with `pip install -e {REPO_ROOT}` (or the pinned "
-        f"requirements in ui/backend/requirements.txt) under Python 3.9-3.11."
+        f"{type(exc).__name__}: {exc}. The Enterprise Cloud Discovery engine is not "
+        f"importable from this interpreter. Install it with `pip install -e {REPO_ROOT}` "
+        f"(or the pinned requirements in ui/backend/requirements.txt) under Python 3.9-3.11."
     )
 
 ENGINE_LOGGER_NAME = "enterprise-cloud-discovery"

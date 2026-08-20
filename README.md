@@ -368,8 +368,8 @@ The engine is primarily a Python application and can run on macOS or Linux. Dock
 ### Option 1: editable development installation
 
 ```bash
-git clone git@github.com:DevOpsLabCode/ecisp.git
-cd ecisp
+git clone git@github.com:DevOpsLabCode/golem.git
+cd golem
 
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -1324,7 +1324,7 @@ This README is not legal advice.
 
 **DevOps Lab Inc.**  
 Email: **hello@devopslabinc.com**  
-Repository: `git@github.com:DevOpsLabCode/ecisp.git`
+Repository: `git@github.com:DevOpsLabCode/golem.git`
 
 When requesting support, include:
 

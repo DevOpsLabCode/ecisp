@@ -76,7 +76,7 @@ def test_send_report_sends_via_smtp_with_attachments(monkeypatch):
     monkeypatch.setenv("SMTP_PORT", "587")
     monkeypatch.setenv("SMTP_USERNAME", "user")
     monkeypatch.setenv("SMTP_PASSWORD", "pass")
-    monkeypatch.setenv("SMTP_FROM", "scanner@ecisp.local")
+    monkeypatch.setenv("SMTP_FROM", "scanner@golem.local")
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
 
     attachments = {"security-report.html": (b"<html></html>", "html"), "security-findings.json": (b"{}", "json")}

@@ -65,7 +65,7 @@ def send_report(
     port = int(os.environ.get("SMTP_PORT", "587"))
     username = os.environ.get("SMTP_USERNAME")
     password = os.environ.get("SMTP_PASSWORD")
-    from_addr = os.environ.get("SMTP_FROM", username or "ecisp-scanner@localhost")
+    from_addr = os.environ.get("SMTP_FROM", username or "golem-scanner@localhost")
     use_tls = os.environ.get("SMTP_USE_TLS", "true").lower() != "false"
 
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
