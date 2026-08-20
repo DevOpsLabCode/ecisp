@@ -62,6 +62,12 @@ app.add_middleware(
     allow_origins=parse_cors_origins(os.environ.get("CORS_ORIGINS", DEFAULT_CORS_ORIGINS)),
     allow_methods=["*"],
     allow_headers=["*"],
+    # The code-scan frontend reads/sends the GitHub OAuth session cookie via
+    # `fetch(..., credentials: "include")` from a different origin (port) than
+    # this API -- without allow_credentials, the browser won't expose those
+    # responses to JS regardless of the cookie itself being sent. Safe here
+    # because allow_origins above is always an explicit whitelist, never "*".
+    allow_credentials=True,
 )
 
 

@@ -156,3 +156,67 @@ export interface RepoScanSummary {
 export interface OrgScanDetail extends OrgScanSummary {
   repositories: RepoScanSummary[];
 }
+
+export type CodeScanSourceType = "upload" | "repo_url";
+export type CodeScanStatus = "queued" | "running" | "completed" | "failed";
+export type DastStatus = "not_run" | "running" | "completed" | "failed";
+
+export interface CodeScanFromRepoRequest {
+  repo_url: string;
+  branch?: string | null;
+}
+
+export interface DastRequest {
+  target_url: string;
+  spider_minutes?: number;
+  active_scan_minutes?: number;
+}
+
+export interface CodeScanSummary {
+  id: string;
+  source_type: CodeScanSourceType;
+  source_label: string;
+  branch: string | null;
+  commit_sha: string | null;
+  status: CodeScanStatus;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+  severity_counts: Record<Severity, number> | null;
+  finding_count: number | null;
+  dast_status: DastStatus;
+  dast_target_url: string | null;
+  dast_error: string | null;
+}
+
+export interface CodeScanFinding {
+  repository: string;
+  file: string;
+  line: number | null;
+  scanner: string;
+  rule_id: string;
+  severity: Severity;
+  category: string;
+  message: string;
+  remediation: string | null;
+  fingerprint: string;
+}
+
+export interface CodeScanDetail extends CodeScanSummary {
+  technologies: string[];
+  scanners_run: string[];
+  scanners_skipped: Record<string, string>;
+  findings: CodeScanFinding[];
+}
+
+export interface RepoBranchesResponse {
+  private: boolean;
+  default_branch: string | null;
+  branches: string[];
+}
+
+export interface GitHubOAuthStatus {
+  connected: boolean;
+  configured: boolean;
+}
