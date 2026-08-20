@@ -176,4 +176,103 @@ describe("api client", () => {
   it("orgScanReportUrl() returns an absolute URL for the given format", () => {
     expect(api.orgScanReportUrl("scan-1", "sarif")).toContain("/api/org-scans/scan-1/report.sarif");
   });
+
+  it("uploadCodeScan() POSTs multipart form data with credentials included", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "code-scan-1", status: "queued" });
+    const file = new File(["PK"], "myproj.zip", { type: "application/zip" });
+    const result = await api.uploadCodeScan(file);
+    expect(result.id).toBe("code-scan-1");
+
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain("/api/code-scans/upload");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+    expect(init.headers).toBeUndefined();
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.get("file")).toBe(file);
+  });
+
+  it("uploadCodeScan() throws the server detail on failure", async () => {
+    globalThis.fetch = mockFetchOnce({ detail: "Archive rejected: zip-slip detected" }, { ok: false, status: 400 });
+    const file = new File(["x"], "evil.zip");
+    await expect(api.uploadCodeScan(file)).rejects.toThrow("Archive rejected: zip-slip detected");
+  });
+
+  it("createCodeScanFromRepo() POSTs to /api/code-scans/repo with the body serialized", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "code-scan-1", status: "queued" });
+    const body = { repo_url: "https://github.com/octocat/Hello-World", branch: "main" };
+    const result = await api.createCodeScanFromRepo(body);
+    expect(result.id).toBe("code-scan-1");
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it("listCodeScanBranches() calls /api/code-scans/branches with the URL-encoded repo_url", async () => {
+    globalThis.fetch = mockFetchOnce({ private: false, default_branch: "main", branches: ["main"] });
+    const result = await api.listCodeScanBranches("https://github.com/octocat/Hello-World");
+    expect(result.branches).toEqual(["main"]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/code-scans/branches?repo_url=https%3A%2F%2Fgithub.com%2Foctocat%2FHello-World"),
+      expect.anything(),
+    );
+  });
+
+  it("listCodeScans() calls /api/code-scans", async () => {
+    globalThis.fetch = mockFetchOnce([{ id: "code-scan-1" }]);
+    const result = await api.listCodeScans();
+    expect(result).toEqual([{ id: "code-scan-1" }]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/code-scans"), expect.anything());
+  });
+
+  it("getCodeScan() calls /api/code-scans/:id", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "code-scan-1" });
+    await api.getCodeScan("code-scan-1");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/code-scans/code-scan-1"),
+      expect.anything(),
+    );
+  });
+
+  it("runCodeScanDast() POSTs to /api/code-scans/:id/dast with the body serialized", async () => {
+    globalThis.fetch = mockFetchOnce({ id: "code-scan-1", dast_status: "running" });
+    const result = await api.runCodeScanDast("code-scan-1", { target_url: "https://staging.example" });
+    expect(result.dast_status).toBe("running");
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain("/api/code-scans/code-scan-1/dast");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ target_url: "https://staging.example" });
+  });
+
+  it("codeScanReportUrl() returns an absolute URL for the given format", () => {
+    expect(api.codeScanReportUrl("code-scan-1", "sarif")).toContain("/api/code-scans/code-scan-1/report.sarif");
+  });
+
+  it("githubOAuthStatus() calls /api/github/oauth/status", async () => {
+    globalThis.fetch = mockFetchOnce({ connected: true, configured: true });
+    const result = await api.githubOAuthStatus();
+    expect(result.connected).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/github/oauth/status"),
+      expect.anything(),
+    );
+  });
+
+  it("githubOAuthLoginUrl() returns an absolute URL to the login redirect", () => {
+    expect(api.githubOAuthLoginUrl()).toContain("/api/github/oauth/login");
+  });
+
+  it("githubOAuthLogout() POSTs to /api/github/oauth/logout with credentials included", async () => {
+    globalThis.fetch = mockFetchOnce({});
+    await api.githubOAuthLogout();
+    const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toContain("/api/github/oauth/logout");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+  });
+
+  it("githubOAuthLogout() throws the server detail on failure", async () => {
+    globalThis.fetch = mockFetchOnce({ detail: "no active session" }, { ok: false, status: 400 });
+    await expect(api.githubOAuthLogout()).rejects.toThrow("no active session");
+  });
 });
