@@ -3,10 +3,25 @@ responder: a small poll loop that asks Golem for pending containment
 commands scoped to this one cluster, and acts on them -- isolate_network
 applies/reverses a NetworkPolicy, kill_process deletes the offending pod
 outright, quarantine_node cordons and taints the node the pod is running
-on before deleting the pod. See the containment build plan for why this
-is pull-based (the responder reaches out to the backend, never the other
-way around) and why its Kubernetes RBAC is the narrowest grant that can
-do the job.
+on before deleting the pod, and revoke_iam (Tier 4) is only ever
+*resolved* here, never applied -- see below. See the containment build
+plan for why this is pull-based (the responder reaches out to the
+backend, never the other way around) and why its Kubernetes RBAC is the
+narrowest grant that can do the job.
+
+**revoke_iam's role in this file stops at resolution**: the in-cluster
+responder reads the target pod's `spec.serviceAccountName` (defaulting to
+"default" if unset) and that ServiceAccount's
+`eks.amazonaws.com/role-arn` annotation -- both plain Kubernetes reads,
+needing nothing beyond the `get` this file's RBAC already grants on pods,
+now extended to `serviceaccounts` too -- then hands the resolved ARN to
+the backend via `resolve-role`. It never calls AWS, never holds an AWS
+credential, and never sees whether the actual revocation succeeds; the
+separate IAM-revocation component (`iam-responder/`, a different process
+with its own AWS credentials and zero Kubernetes access) does that part.
+If no IRSA role annotation is found, `revoke_iam` fails once and stays
+failed -- unlike quarantine_node, that's not a transient condition worth
+retrying, it means the workload isn't using IRSA at all.
 
 **Why kill_process is `kubectl delete pod`, not a real eBPF process kill**:
 the plan's original design leaned toward Tetragon, but Tetragon's
@@ -45,11 +60,13 @@ one-off isolation label a NetworkPolicy's `podSelector` needs -- Kubernetes
 has no way to select a NetworkPolicy target by pod name directly; delete
 for kill_process and quarantine_node), `get`/`patch` on nodes (cordon and
 taint, quarantine_node only -- nodes are cluster-scoped resources, so this
-can't be narrowed to a namespace even in principle), and
-`get`/`list`/`create`/`patch`/`delete` on networkpolicies. No access to any
-other resource kind, and nothing enqueues a command in the first place
-unless an operator has explicitly opted a Falco rule into that specific
-action (see `containment_store.upsert_response_rule`).
+can't be narrowed to a namespace even in principle), `get` on
+serviceaccounts (revoke_iam's role-ARN resolution only -- no write verbs
+at all, since this file only ever reads the annotation, never touches
+AWS), and `get`/`list`/`create`/`patch`/`delete` on networkpolicies. No
+access to any other resource kind, and nothing enqueues a command in the
+first place unless an operator has explicitly opted a Falco rule into
+that specific action (see `containment_store.upsert_response_rule`).
 
 **Why token substitution instead of `.format()`**: unlike
 `install_script.py`'s template, this one is mostly shell (`${VAR}`
@@ -107,6 +124,9 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "create", "patch", "delete"]
@@ -229,6 +249,22 @@ spec:
                       # containment_store.RETRYABLE_ACTIONS) -- this
                       # "failed" report may just increment an attempt
                       # counter server-side rather than going terminal.
+                      report_status "failed" "${id}"
+                    fi
+
+                  elif [ "${status}" = "pending" ] && [ "${action}" = "revoke_iam" ]; then
+                    sa=$(kubectl get pod "${pod}" -n "${ns}" \\
+                      -o jsonpath='{.spec.serviceAccountName}' 2>/dev/null || true)
+                    sa="${sa:-default}"
+                    arn=$(kubectl get serviceaccount "${sa}" -n "${ns}" \\
+                      -o jsonpath='{.metadata.annotations.eks\\.amazonaws\\.com/role-arn}' 2>/dev/null || true)
+                    if [ -n "${arn}" ] \\
+                      && curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                        -d "{\\"role_arn\\": \\"${arn}\\"}" \\
+                        "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${id}/resolve-role" \\
+                        >/dev/null 2>&1; then
+                      : # resolve-role already moved the command server-side; nothing else to report
+                    else
                       report_status "failed" "${id}"
                     fi
 

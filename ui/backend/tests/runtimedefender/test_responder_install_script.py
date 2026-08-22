@@ -24,13 +24,14 @@ def test_build_responder_install_script_includes_the_cluster_name():
     assert "production-eks" in script
 
 
-def test_build_responder_install_script_scopes_rbac_to_exactly_three_resource_kinds():
+def test_build_responder_install_script_scopes_rbac_to_exactly_four_resource_kinds():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     assert 'resources: ["pods"]' in script
     assert 'resources: ["nodes"]' in script
+    assert 'resources: ["serviceaccounts"]' in script
     assert 'resources: ["networkpolicies"]' in script
-    # Nothing else -- the RBAC grant is exactly these three resource kinds.
-    assert script.count("resources:") == 3
+    # Nothing else -- the RBAC grant is exactly these four resource kinds.
+    assert script.count("resources:") == 4
 
 
 def test_build_responder_install_script_uses_a_cluster_role_not_a_namespaced_role():
@@ -76,3 +77,32 @@ def test_build_responder_install_script_quarantine_node_never_uses_no_execute():
     # not just the one Falco flagged -- see the module docstring.
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     assert "NoExecute" not in script
+
+
+def test_build_responder_install_script_serviceaccounts_rbac_is_read_only():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert 'resources: ["serviceaccounts"]\n    verbs: ["get"]' in script
+
+
+def test_build_responder_install_script_resolves_revoke_iam_role_via_serviceaccount_annotation():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert '"${action}" = "revoke_iam"' in script
+    assert "spec.serviceAccountName" in script
+    assert "eks\\.amazonaws\\.com/role-arn" in script
+
+
+def test_build_responder_install_script_posts_the_resolved_role_arn_to_resolve_role():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${id}/resolve-role" in script
+
+
+def test_build_responder_install_script_never_calls_aws_apis_directly():
+    # The in-cluster responder only ever resolves a role ARN via
+    # Kubernetes reads -- it must never itself hold or use AWS
+    # credentials. A crude but meaningful guardrail: no AWS SDK/CLI
+    # invocation anywhere in the generated script.
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "aws " not in script
+    assert "boto3" not in script
+    assert "sts:" not in script
+    assert "iam:" not in script
