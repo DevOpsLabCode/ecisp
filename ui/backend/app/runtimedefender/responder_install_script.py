@@ -1,9 +1,21 @@
 """Generates the one-command install script for the Phase 1 in-cluster
 responder: a small poll loop that asks Golem for pending containment
-commands scoped to this one cluster, and applies/reverses a NetworkPolicy
-in response. See the containment build plan for why this is pull-based
-(the responder reaches out to the backend, never the other way around) and
-why its Kubernetes RBAC is the narrowest grant that can do the job.
+commands scoped to this one cluster, and acts on them -- isolate_network
+applies/reverses a NetworkPolicy, kill_process deletes the offending pod
+outright. See the containment build plan for why this is pull-based (the
+responder reaches out to the backend, never the other way around) and why
+its Kubernetes RBAC is the narrowest grant that can do the job.
+
+**Why kill_process is `kubectl delete pod`, not a real eBPF process kill**:
+the plan's original design leaned toward Tetragon, but Tetragon's
+TracingPolicy CRDs are declarative cluster-wide rules ("always kill any
+process matching X"), not an imperative "kill this one already-detected
+process now" API -- fitting it into this command-queue architecture would
+mean generating and applying a fresh TracingPolicy per incident, a far
+less proven pattern than NetworkPolicy-per-pod. Deleting the whole pod is
+coarser (it takes every container in the pod down, not one surgical
+process), but reuses the exact same responder this file already has, and
+in practice most workloads are one-process-per-container anyway.
 
 Deliberately no custom container image to build or publish -- `alpine/k8s`
 already bundles `kubectl`, `curl`, and `jq`, the only three tools the poll
@@ -15,13 +27,14 @@ names can be in any namespace on the cluster (wherever the workload that
 tripped the Falco rule happens to run), not just the responder's own
 namespace -- a namespaced Role can't reach across namespaces at all, so the
 RBAC has to be cluster-scoped even though it's still as narrow as possible
-on verbs: `get`/`list`/`patch` on pods (patch only to attach the one-off
-isolation label a NetworkPolicy's `podSelector` needs -- Kubernetes has no
-way to select a NetworkPolicy target by pod name directly), and
-`get`/`list`/`create`/`patch`/`delete` on networkpolicies. No access to any
-other resource kind, and nothing enqueues an `isolate_network` command in
-the first place unless an operator has explicitly opted a Falco rule into
-it (see `containment_store.upsert_response_rule`).
+on verbs: `get`/`list`/`patch`/`delete` on pods (patch to attach the
+one-off isolation label a NetworkPolicy's `podSelector` needs -- Kubernetes
+has no way to select a NetworkPolicy target by pod name directly; delete
+for kill_process), and `get`/`list`/`create`/`patch`/`delete` on
+networkpolicies. No access to any other resource kind, and nothing
+enqueues a command in the first place unless an operator has explicitly
+opted a Falco rule into that specific action (see
+`containment_store.upsert_response_rule`).
 
 **Why token substitution instead of `.format()`**: unlike
 `install_script.py`'s template, this one is mostly shell (`${VAR}`
@@ -75,7 +88,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list", "patch"]
+    verbs: ["get", "list", "patch", "delete"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "create", "patch", "delete"]
@@ -144,6 +157,13 @@ spec:
             - |
               set -eu
               echo "Golem Defender responder starting for cluster ${CLUSTER_NAME} (${CLUSTER_ID})"
+
+              report_status() {
+                curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                  -d "{\\"status\\": \\"${1}\\"}" \\
+                  "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${2}/status" >/dev/null 2>&1 || true
+              }
+
               while true; do
                 commands=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \\
                   "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands" || echo '[]')
@@ -164,21 +184,23 @@ spec:
                     netpol_json="${netpol_p1}${netpol_p2}${netpol_p3}${netpol_p4}${netpol_p5}"
                     if kubectl label pod "${pod}" -n "${ns}" "golem-io/isolated=${id}" --overwrite >/dev/null 2>&1 \\
                       && echo "${netpol_json}" | kubectl apply -f - >/dev/null 2>&1; then
-                      new_status="applied"
+                      report_status "applied" "${id}"
                     else
-                      new_status="failed"
+                      report_status "failed" "${id}"
                     fi
-                    curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
-                      -d "{\\"status\\": \\"${new_status}\\"}" \\
-                      "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${id}/status" >/dev/null 2>&1 || true
+
+                  elif [ "${status}" = "pending" ] && [ "${action}" = "kill_process" ]; then
+                    if kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force >/dev/null 2>&1; then
+                      report_status "applied" "${id}"
+                    else
+                      report_status "failed" "${id}"
+                    fi
 
                   elif [ "${status}" = "release_pending" ]; then
                     kubectl delete networkpolicy "golem-isolate-${id}" -n "${ns}" --ignore-not-found \\
                       >/dev/null 2>&1 || true
                     kubectl label pod "${pod}" -n "${ns}" "golem-io/isolated-" >/dev/null 2>&1 || true
-                    curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
-                      -d '{"status": "released"}' \\
-                      "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${id}/status" >/dev/null 2>&1 || true
+                    report_status "released" "${id}"
                   fi
                 done
 

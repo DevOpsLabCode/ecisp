@@ -197,6 +197,16 @@ def test_request_release_rejects_a_command_that_was_never_applied(session):
         request_release(session, command.id)
 
 
+def test_request_release_rejects_a_kill_process_command_even_when_applied(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="kill_process")
+    session.commit()
+    update_command_status(session, command.id, "applied")
+    session.commit()
+
+    with pytest.raises(InvalidCommandTransition):
+        request_release(session, command.id)
+
+
 def test_request_release_raises_for_unknown_command_id(session):
     with pytest.raises(CommandNotFound):
         request_release(session, "does-not-exist")

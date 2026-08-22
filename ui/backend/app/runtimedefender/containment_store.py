@@ -34,6 +34,11 @@ COMMAND_STATUSES = ("pending", "applied", "failed", "release_pending", "released
 # "failed", "released") is a terminal state the responder has no more work
 # to do for.
 ACTIONABLE_STATUSES = ("pending", "release_pending")
+# Only network isolation can be released -- once a kill_process command is
+# "applied", the process is already gone; there's nothing left to reverse.
+# See the build plan: confirmation for kill_process means "we know it
+# happened," not "we can undo it."
+RELEASABLE_ACTIONS = ("isolate_network",)
 
 
 class UnknownResponseAction(ValueError):
@@ -192,10 +197,13 @@ def request_release(session: Session, command_id: str, *, cluster_id: str | None
     """The human-triggered reversal the build plan calls for: an operator
     releasing an isolation. Only valid from "applied" -- a command that
     never got applied (still "pending", or "failed") has nothing to
-    reverse. The responder picks up "release_pending" on its next poll,
-    deletes the NetworkPolicy, and reports back "released" via
-    `update_command_status`."""
+    reverse -- and only for `RELEASABLE_ACTIONS` -- a kill_process command
+    has nothing to reverse either, just further along. The responder
+    picks up "release_pending" on its next poll, deletes the
+    NetworkPolicy, and reports back "released" via `update_command_status`."""
     command = _get_command(session, command_id, cluster_id=cluster_id)
+    if command.action not in RELEASABLE_ACTIONS:
+        raise InvalidCommandTransition(f"{command.action!r} commands cannot be released -- nothing to reverse")
     if command.status != "applied":
         raise InvalidCommandTransition(
             f"Cannot release a command in status {command.status!r} -- only an 'applied' command can be released"

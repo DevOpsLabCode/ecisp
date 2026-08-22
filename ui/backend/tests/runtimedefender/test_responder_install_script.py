@@ -43,3 +43,15 @@ def test_build_responder_install_script_uses_a_cluster_role_not_a_namespaced_rol
 def test_build_responder_install_script_polls_the_commands_endpoint_scoped_to_its_own_cluster():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands" in script
+
+
+def test_build_responder_install_script_pods_rbac_includes_delete_for_kill_process():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert 'verbs: ["get", "list", "patch", "delete"]' in script
+
+
+def test_build_responder_install_script_handles_kill_process_via_kubectl_delete_pod():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert '"${action}" = "kill_process"' in script
+    assert "kubectl delete pod" in script
+    assert "--grace-period=0 --force" in script
