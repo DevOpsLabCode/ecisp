@@ -32,6 +32,16 @@ class _FakeBackend:
     def report_status(self, command_id: str, status: str) -> None:
         self.reported.append((command_id, status))
 
+    def list_aws_accounts(self) -> list[dict]:
+        # No registered accounts -- the sweep still runs every cycle in
+        # these tests (poll_interval_seconds=0 collapses the sweep
+        # cadence to every cycle, see run_forever), this just keeps it a
+        # clean no-op instead of exercising its own error path here.
+        return []
+
+    def report_account_coverage(self, account_id: str, status: str) -> None:
+        raise AssertionError("no accounts were registered -- this should never be called")
+
 
 def test_run_forever_processes_at_least_one_cycle_before_stopping(monkeypatch):
     stop_after = _StopAfter(1)
@@ -72,6 +82,32 @@ def test_run_forever_survives_a_cycle_that_raises_and_keeps_polling(monkeypatch)
     # Reached the second sleep -- proves the loop didn't propagate the
     # exception out and die after the first failed cycle.
     assert stop_after.calls == 2
+
+
+def test_run_forever_logs_when_a_sweep_actually_checks_accounts(monkeypatch, caplog):
+    stop_after = _StopAfter(1)
+    monkeypatch.setattr(responder.time, "sleep", stop_after)
+
+    class _AccountBackend(_FakeBackend):
+        def list_aws_accounts(self) -> list[dict]:
+            return [{"account_id": "123456789012", "assume_role_status": "unverified"}]
+
+        def report_account_coverage(self, account_id: str, status: str) -> None:
+            self.reported.append((account_id, status))
+
+    class _RaisingSts:
+        # Doesn't matter whether the check itself succeeds or fails here
+        # -- only that the sweep runs and logs having checked an account.
+        def assume_role(self, **_kwargs):
+            raise RuntimeError("simulated")
+
+    backend = _AccountBackend([])
+
+    with caplog.at_level("INFO"), pytest.raises(StopIteration):
+        responder.run_forever(backend, lambda: _RaisingSts(), poll_interval_seconds=0)
+
+    assert backend.reported == [("123456789012", "failed")]
+    assert any("Swept account coverage for 1 account" in message for message in caplog.messages)
 
 
 def test_handle_command_reports_failed_for_an_unexpected_status():

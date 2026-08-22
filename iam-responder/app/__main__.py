@@ -14,7 +14,7 @@ import sys
 import boto3
 
 from .backend_client import GolemBackendClient
-from .responder import DEFAULT_ROLE_TEMPLATE, run_forever
+from .responder import DEFAULT_ACCOUNT_SWEEP_INTERVAL_SECONDS, DEFAULT_ROLE_TEMPLATE, run_forever
 
 
 def main() -> None:
@@ -28,13 +28,18 @@ def main() -> None:
 
     role_template = os.environ.get("GOLEM_ASSUME_ROLE_TEMPLATE", DEFAULT_ROLE_TEMPLATE)
     poll_interval_seconds = float(os.environ.get("POLL_INTERVAL_SECONDS", "10"))
+    account_sweep_interval_seconds = float(
+        os.environ.get("ACCOUNT_SWEEP_INTERVAL_SECONDS", str(DEFAULT_ACCOUNT_SWEEP_INTERVAL_SECONDS))
+    )
 
     backend = GolemBackendClient(backend_url, api_key)
     # A fresh STS client per poll cycle (see responder.run_forever) --
     # boto3's default credential chain (env vars, instance/task/pod role,
     # ~/.aws/credentials) picks up this component's own AWS identity,
     # never anything passed on the command line.
-    run_forever(backend, lambda: boto3.client("sts"), role_template, poll_interval_seconds)
+    run_forever(
+        backend, lambda: boto3.client("sts"), role_template, poll_interval_seconds, account_sweep_interval_seconds
+    )
 
 
 if __name__ == "__main__":

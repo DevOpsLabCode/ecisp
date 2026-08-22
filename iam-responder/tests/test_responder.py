@@ -7,7 +7,7 @@ from moto import mock_aws
 
 from app.aws_actions import DENY_ALL_POLICY_NAME
 from app.backend_client import GolemBackendClient
-from app.responder import DEFAULT_ROLE_TEMPLATE, process_once
+from app.responder import DEFAULT_ROLE_TEMPLATE, process_once, sweep_account_coverage
 
 
 @pytest.fixture
@@ -143,3 +143,86 @@ def test_process_once_with_no_commands_does_nothing(moto_accounts):
     processed = process_once(backend, sts, role_template=DEFAULT_ROLE_TEMPLATE)
 
     assert processed == 0
+
+
+# ---- sweep_account_coverage -------------------------------------------
+
+
+def _backend_with_accounts(accounts: list[dict], coverage_calls: list[tuple[str, str]]) -> GolemBackendClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=accounts)
+        # POST .../coverage
+        account_id = request.url.path.rsplit("/", 2)[1]
+        body = json.loads(request.content)
+        coverage_calls.append((account_id, body["status"]))
+        return httpx.Response(204)
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    return GolemBackendClient("https://golem.example.com", "test-key", http_client=http_client)
+
+
+def test_sweep_account_coverage_verified_for_a_real_assumable_account(moto_accounts):
+    coverage_calls: list[tuple[str, str]] = []
+    accounts = [{"account_id": "123456789012", "assume_role_status": "unverified"}]
+    backend = _backend_with_accounts(accounts, coverage_calls)
+    sts = boto3.client("sts", region_name="us-east-1")
+
+    swept = sweep_account_coverage(backend, sts, role_template="arn:aws:iam::{account_id}:role/golem-iam-responder")
+
+    assert swept == 1
+    assert coverage_calls == [("123456789012", "verified")]
+
+
+def test_sweep_account_coverage_failed_for_an_unassumable_account():
+    # A stub, not moto -- moto's STS mock doesn't validate RoleArn
+    # existence or format by default (confirmed empirically in
+    # test_account_coverage.py), so it can't produce a real assumption
+    # failure. This exercises the same "any failure becomes 'failed'"
+    # contract with a client that actually fails.
+    class _RaisingSts:
+        def assume_role(self, **_kwargs):
+            raise RuntimeError("simulated AccessDenied")
+
+    coverage_calls: list[tuple[str, str]] = []
+    accounts = [{"account_id": "999999999999", "assume_role_status": "unverified"}]
+    backend = _backend_with_accounts(accounts, coverage_calls)
+
+    sweep_account_coverage(
+        backend, _RaisingSts(), role_template="arn:aws:iam::{account_id}:role/golem-iam-responder"
+    )
+
+    assert coverage_calls == [("999999999999", "failed")]
+
+
+def test_sweep_account_coverage_processes_every_registered_account(moto_accounts):
+    # Both report "verified" here -- moto's STS mock only validates the
+    # role *name* in an assumed ARN, not the account-id digits, so it
+    # can't naturally produce a mixed verified/failed outcome across two
+    # *different* account_ids sharing one role_template the way a real
+    # multi-account AWS setup would (see the single-account verified/
+    # failed tests above for that distinction, made via role *name*
+    # instead). What this test actually proves: the sweep iterates every
+    # registered account and reports each one individually, not just the
+    # first.
+    coverage_calls: list[tuple[str, str]] = []
+    accounts = [
+        {"account_id": "123456789012", "assume_role_status": "unverified"},
+        {"account_id": "999999999999", "assume_role_status": "unverified"},
+    ]
+    backend = _backend_with_accounts(accounts, coverage_calls)
+    sts = boto3.client("sts", region_name="us-east-1")
+
+    swept = sweep_account_coverage(backend, sts, role_template="arn:aws:iam::{account_id}:role/golem-iam-responder")
+
+    assert swept == 2
+    assert coverage_calls == [("123456789012", "verified"), ("999999999999", "verified")]
+
+
+def test_sweep_account_coverage_with_no_registered_accounts_does_nothing(moto_accounts):
+    backend = _backend_with_accounts([], [])
+    sts = boto3.client("sts", region_name="us-east-1")
+
+    swept = sweep_account_coverage(backend, sts, role_template=DEFAULT_ROLE_TEMPLATE)
+
+    assert swept == 0

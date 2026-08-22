@@ -1,8 +1,10 @@
-"""Thin HTTP client for the two Golem backend routes this component ever
-calls -- GET /api/iam-revocation/commands and POST .../status. Both
-authenticate with IAM_RESPONDER_API_KEY as a bearer token, a fleet-wide
-credential entirely separate from any cluster's own install token (see
-ui/backend/app/main.py's _authenticated_iam_component).
+"""Thin HTTP client for the Golem backend routes this component calls --
+the containment ones (GET /api/iam-revocation/commands, POST .../status)
+and the AWS-account coverage ones (GET /api/aws-accounts, POST
+.../coverage). All of them authenticate with IAM_RESPONDER_API_KEY as a
+bearer token, a fleet-wide credential entirely separate from any
+cluster's own install token (see ui/backend/app/main.py's
+_authenticated_iam_component).
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from __future__ import annotations
 import httpx
 
 VALID_STATUSES = ("applied", "failed", "released")
+VALID_ACCOUNT_STATUSES = ("verified", "failed")
 
 
 class GolemBackendClient:
@@ -30,6 +33,25 @@ class GolemBackendClient:
             raise ValueError(f"Unknown status {status!r}, expected one of {VALID_STATUSES}")
         response = self._client.post(
             f"{self._base_url}/api/iam-revocation/commands/{command_id}/status",
+            headers=self._headers,
+            json={"status": status},
+        )
+        response.raise_for_status()
+
+    def list_aws_accounts(self) -> list[dict]:
+        """The registered accounts to sweep -- see
+        coverage_store.register_aws_account on the backend for why this
+        is an explicit registry, not something discovered from
+        commands already seen."""
+        response = self._client.get(f"{self._base_url}/api/aws-accounts", headers=self._headers)
+        response.raise_for_status()
+        return response.json()
+
+    def report_account_coverage(self, account_id: str, status: str) -> None:
+        if status not in VALID_ACCOUNT_STATUSES:
+            raise ValueError(f"Unknown account status {status!r}, expected one of {VALID_ACCOUNT_STATUSES}")
+        response = self._client.post(
+            f"{self._base_url}/api/aws-accounts/{account_id}/coverage",
             headers=self._headers,
             json={"status": status},
         )

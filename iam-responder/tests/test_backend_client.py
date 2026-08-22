@@ -59,6 +59,43 @@ def test_close_closes_the_underlying_http_client():
         client.list_commands()  # httpx raises once its client is closed
 
 
+def test_list_aws_accounts_calls_the_right_url():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json=[{"account_id": "123456789012", "assume_role_status": "unverified"}])
+
+    client = _client_with_transport(handler)
+    accounts = client.list_aws_accounts()
+
+    assert captured["url"] == "https://golem.example.com/api/aws-accounts"
+    assert captured["auth"] == "Bearer test-api-key"
+    assert accounts == [{"account_id": "123456789012", "assume_role_status": "unverified"}]
+
+
+def test_report_account_coverage_posts_to_the_right_account():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = request.content
+        return httpx.Response(204)
+
+    client = _client_with_transport(handler)
+    client.report_account_coverage("123456789012", "verified")
+
+    assert captured["url"] == "https://golem.example.com/api/aws-accounts/123456789012/coverage"
+    assert captured["body"] == b'{"status":"verified"}'
+
+
+def test_report_account_coverage_rejects_an_unknown_status():
+    client = _client_with_transport(lambda request: httpx.Response(204))
+    with pytest.raises(ValueError, match="Unknown account status"):
+        client.report_account_coverage("123456789012", "sort-of-works")
+
+
 def test_base_url_trailing_slash_is_stripped():
     captured = {}
 

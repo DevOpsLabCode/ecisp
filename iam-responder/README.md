@@ -30,6 +30,17 @@ token (see `ui/backend/app/main.py`). For each command:
 Reports `applied` / `released` / `failed` back to the same command via
 `POST /api/iam-revocation/commands/{id}/status`.
 
+On a much slower, separate cadence (default hourly, `ACCOUNT_SWEEP_INTERVAL_SECONDS`),
+it also sweeps every AWS account registered via `POST /api/aws-accounts` on
+the backend: assumes into each one and makes one minimal IAM read
+(`list_account_aliases`) to confirm the cross-account trust relationship
+actually grants IAM access, not just that STS accepts the assumption --
+then reports `verified`/`failed` to `POST /api/aws-accounts/{id}/coverage`.
+This is the only thing in the whole containment system that can verify
+Tier 4's cross-account trust before a real incident needs it; the
+in-cluster responder has no AWS access to check this with. See
+`app/account_coverage.py`.
+
 ## Cross-account assumption
 
 Every monitored AWS account is expected to have a role this component can
@@ -45,15 +56,24 @@ That role needs, at minimum:
       "Effect": "Allow",
       "Action": ["iam:PutRolePolicy", "iam:DeleteRolePolicy"],
       "Resource": "arn:aws:iam::*:role/golem-monitored-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:ListAccountAliases",
+      "Resource": "*"
     }
   ]
 }
 ```
 
-Scoping `Resource` to a naming convention (`golem-monitored-*`) rather than
-`*` means this component -- even fully compromised -- can only ever touch
-roles an operator has already opted into monitoring, not arbitrary IAM
-roles in the account. Deciding on and provisioning that per-account trust
+`ListAccountAliases` has no meaningful resource to scope -- it's account-
+level, always-available, and exists in this policy purely so the coverage
+sweep (above) has something harmless to call to confirm the session works
+at all. Scoping the `PutRolePolicy`/`DeleteRolePolicy` `Resource` to a
+naming convention (`golem-monitored-*`) rather than `*` means this
+component -- even fully compromised -- can only ever touch roles an
+operator has already opted into monitoring, not arbitrary IAM roles in
+the account. Deciding on and provisioning that per-account trust
 relationship (via Terraform, reusing the cross-account patterns already
 established for `demand-gig-engine`) is separate follow-up work; nothing
 in this repo sets it up automatically.
@@ -71,6 +91,7 @@ pip install -r requirements.txt
 export BACKEND_URL=https://golem.example.com
 export IAM_RESPONDER_API_KEY=...          # matches the backend's own env var
 export POLL_INTERVAL_SECONDS=10           # default
+export ACCOUNT_SWEEP_INTERVAL_SECONDS=3600 # default -- how often to re-test cross-account trust
 python -m app
 ```
 
