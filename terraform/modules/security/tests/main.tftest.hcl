@@ -75,8 +75,11 @@ run "db_sg_allows_postgres_egress_within_the_vpc" {
   # aws_security_group.db.ingress mixes a security_groups-scoped rule with a
   # self-referential one; the self rule's resolved value is unknown until
   # apply, which makes the whole ingress set unusable in a plan-time
-  # condition. The db security group's egress (no self-reference involved)
-  # is fully known at plan time and exercises the same module logic.
+  # condition (see the db_sg_ingress_and_outputs_reflect_the_created_groups
+  # apply run below, which overrides every security group with known ids and
+  # asserts on ingress directly). The db security group's egress (no
+  # self-reference involved) is fully known at plan time and exercises the
+  # same module logic.
   assert {
     condition     = contains([for e in aws_security_group.db.egress : e.from_port], 5432)
     error_message = "db security group must allow PostgreSQL egress to targets inside the VPC"
@@ -96,4 +99,89 @@ run "rejects_an_invalid_vpc_id" {
   }
 
   expect_failures = [var.vpc_id]
+}
+
+run "rejects_an_empty_name" {
+  command = plan
+
+  variables {
+    name = "   "
+  }
+
+  expect_failures = [var.name]
+}
+
+run "rejects_an_invalid_vpc_cidr" {
+  command = plan
+
+  variables {
+    vpc_cidr = "not-a-cidr"
+  }
+
+  expect_failures = [var.vpc_cidr]
+}
+
+run "rejects_an_out_of_range_app_port" {
+  command = plan
+
+  variables {
+    app_port = 70000
+  }
+
+  expect_failures = [var.app_port]
+}
+
+run "db_sg_ingress_and_outputs_reflect_the_created_groups" {
+  command = apply
+
+  override_resource {
+    target = aws_security_group.alb
+    values = {
+      id = "sg-alb0000000000000"
+    }
+  }
+
+  override_resource {
+    target = aws_security_group.app
+    values = {
+      id = "sg-app0000000000000"
+    }
+  }
+
+  override_resource {
+    target = aws_security_group.db
+    values = {
+      id = "sg-db00000000000000"
+    }
+  }
+
+  assert {
+    condition     = output.alb_sg_id == "sg-alb0000000000000"
+    error_message = "alb_sg_id output must reflect the created alb security group's id"
+  }
+
+  assert {
+    condition     = output.app_sg_id == "sg-app0000000000000"
+    error_message = "app_sg_id output must reflect the created app security group's id"
+  }
+
+  assert {
+    condition     = output.db_sg_id == "sg-db00000000000000"
+    error_message = "db_sg_id output must reflect the created db security group's id"
+  }
+
+  assert {
+    condition     = length(aws_security_group.db.ingress) == 2
+    error_message = "db security group should have exactly two ingress rules (from app, and self-referential from RDS Proxy)"
+  }
+
+  assert {
+    condition     = anytrue([for i in aws_security_group.db.ingress : i.self == true])
+    error_message = "db security group must include a self-referential ingress rule for RDS Proxy to PostgreSQL"
+  }
+
+  assert {
+    condition     = anytrue([for i in aws_security_group.db.ingress : try(contains(i.security_groups, "sg-app0000000000000"), false)])
+    error_message = "db security group must allow ingress from the app security group"
+  }
 }
