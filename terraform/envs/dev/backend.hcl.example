@@ -1,0 +1,12 @@
+# Author: Stan Zvenigorodskiy | DevOps Lab Inc. | https://DevOpsLabInc.com
+# Environment: dev
+# Purpose: Shows the generated remote-state backend settings for this environment without embedding credentials.
+# terraform/scripts/bootstrap.sh generates the real envs/dev/backend.hcl (gitignored) from global/bootstrap's own
+# outputs -- copy this file's shape only if you need to understand what that script produces.
+
+bucket       = "golem-dev-ACCOUNT_ID-tfstate"
+key          = "dev/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+kms_key_id   = "REPLACED_BY_BOOTSTRAP_SH"
+use_lockfile = true
