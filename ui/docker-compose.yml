@@ -4,6 +4,25 @@
 # Image names/tags are overridable (CI sets these to ghcr.io/... tags so the
 # exact images that get smoke-tested here are the ones that get pushed).
 services:
+  db:
+    # Runtime Defender containment state only (app/db.py) -- the rule
+    # ->response mapping and command queue, which need to survive a backend
+    # restart, unlike everything else this app persists (report files,
+    # in-memory scan state). Nothing else in this compose file touches it.
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: golem_defender
+      POSTGRES_USER: golem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-golem-dev-only}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U golem -d golem_defender"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   backend:
     build:
       context: ..
@@ -26,6 +45,10 @@ services:
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
       BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
+      DATABASE_URL: postgresql+psycopg://golem:${POSTGRES_PASSWORD:-golem-dev-only}@db:5432/golem_defender
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - reports:/app/ui/backend/data/reports
       # Uncomment to enable "profile" auth (including cross-account role
@@ -54,3 +77,4 @@ services:
 
 volumes:
   reports:
+  db-data:

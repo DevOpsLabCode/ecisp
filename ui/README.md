@@ -261,6 +261,34 @@ critical, 12 medium, 4 low — showed up correctly in the running backend
 and rendered in the actual UI, run via the exact `curl | bash` command
 the UI displays (not a shortcut around it).
 
+### Containment (in progress)
+
+Detect-and-report is still the only thing a deployed cluster actually does
+today. The pieces landing so far are the durable-storage foundation a
+future in-cluster responder needs, not the responder itself:
+
+- `app/db.py` — a SQLAlchemy engine/session, separate from every other scan
+  type's in-memory or report-file state, because the two tables below must
+  survive a backend restart. `DATABASE_URL` defaults to a local SQLite file
+  so a bare `uvicorn app.main:app` needs no external service; set it to a
+  real Postgres DSN in production (see `docker-compose.yml`'s `db` service).
+- `app/runtimedefender/containment_models.py` /
+  `containment_store.py` — two tables: `response_rules` (which Falco rule
+  IDs are opted into an automated response, and which action — the opt-in
+  mechanism itself), and `response_commands` (one queued containment action
+  per cluster/pod, which a future in-cluster responder will long-poll,
+  scoped to its own `cluster_id` only).
+- `alembic/` — schema migrations. `alembic upgrade head` applies them; the
+  Docker image runs it automatically on container start (see
+  `Dockerfile`'s `CMD`).
+
+Nothing in `app/main.py` calls into `containment_store` yet — there are no
+new HTTP routes, and `RuntimeDefenderManager`'s existing in-memory cluster/
+finding registry is untouched. The actual containment behavior (an
+in-cluster responder applying a NetworkPolicy, RBAC scoped narrowly to
+`networkpolicies`/`pods`, the confirm/alert/reversal flow) is tracked as
+follow-up work.
+
 ## How it fits together
 
 The backend does **not** shell out to the `enterprise-cloud-discovery` CLI —

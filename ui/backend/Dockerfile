@@ -175,6 +175,8 @@ WORKDIR /app
 COPY --from=app-builder /app/EnterpriseCloudDiscovery ./EnterpriseCloudDiscovery
 COPY --from=app-builder /app/setup.py /app/README.md ./
 COPY ui/backend/app ./ui/backend/app
+COPY ui/backend/alembic.ini ./ui/backend/alembic.ini
+COPY ui/backend/alembic ./ui/backend/alembic
 RUN mkdir -p ./ui/backend/data/reports ./ui/backend/data/orgscan-reports \
       ./ui/backend/data/codescan-reports ./ui/backend/data/codescan-uploads
 
@@ -184,4 +186,8 @@ USER appuser
 
 WORKDIR /app/ui/backend
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Applies pending containment-table migrations (app/db.py, alembic/) before
+# the app starts -- see docker-compose.yml's DATABASE_URL. Against the
+# default SQLite DATABASE_URL (no DB service configured) this is a no-op
+# past the first run.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
