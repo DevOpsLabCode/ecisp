@@ -1,0 +1,5 @@
+# Golem IAM Responder -- deliberately minimal. No web framework, no
+# Kubernetes client of any kind -- this process only ever talks to AWS
+# and to the Golem backend's /api/iam-revocation/* routes over plain HTTP.
+boto3==1.43.78
+httpx==0.28.1

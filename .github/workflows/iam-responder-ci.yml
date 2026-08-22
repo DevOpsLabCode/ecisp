@@ -1,0 +1,173 @@
+name: iam-responder-ci
+
+# CI for iam-responder/, the privilege-isolated Tier 4 (IAM revocation)
+# component -- deliberately its own workflow, not folded into ui-ci.yml,
+# the same way this component is its own deployable process rather than a
+# route inside ui/backend's FastAPI app. Scoped to iam-responder/** so it
+# doesn't run on changes elsewhere in the repo.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "iam-responder/**"
+      - ".github/workflows/iam-responder-ci.yml"
+  pull_request:
+    paths:
+      - "iam-responder/**"
+      - ".github/workflows/iam-responder-ci.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: iam-responder-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Tests + coverage (>=95%)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: iam-responder
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: iam-responder/requirements-test.txt
+
+      # Every AWS call in this suite goes through moto, which intercepts
+      # boto3 before it reaches the network -- see tests/test_*.py and the
+      # README's testing section. Nothing here ever calls real AWS.
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run pytest with coverage gate
+        run: pytest
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## iam-responder coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: iam-responder-coverage
+          path: |
+            iam-responder/htmlcov/
+            iam-responder/coverage.xml
+          retention-days: 14
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: iam-responder
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff==0.8.4
+      - run: ruff check .
+
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: iam-responder
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install "bandit[toml]==1.8.0"
+      - run: bandit -r app -c pyproject.toml
+
+  dependency-scan:
+    name: Dependency + secret scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: iam-responder/
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "1"
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+
+  docker-build:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t golem-iam-responder:ci iam-responder/
+      - name: Image starts and fails closed without required config
+        # A minimal real-behavior smoke test: run the built image with no
+        # env vars set and confirm it exits 1 with the expected message,
+        # rather than crashing some other way or hanging.
+        run: |
+          set +e
+          output=$(docker run --rm golem-iam-responder:ci 2>&1)
+          exit_code=$?
+          set -e
+          echo "$output"
+          [ "$exit_code" -eq 1 ]
+          echo "$output" | grep -q "BACKEND_URL and IAM_RESPONDER_API_KEY are both required"
+
+  # ---------------------------------------------------------------------
+  # Single required check for branch protection
+  # ---------------------------------------------------------------------
+  ci-summary:
+    name: iam-responder-ci summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: always()
+    needs:
+      - test
+      - lint
+      - sast
+      - dependency-scan
+      - docker-build
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more iam-responder-ci jobs failed."
+            exit 1
+          fi
+          echo "All iam-responder-ci jobs passed."

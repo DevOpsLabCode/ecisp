@@ -1,0 +1,5 @@
+# Minimal set needed to run the unit test suite.
+-r requirements.txt
+pytest==9.1.1
+pytest-cov==7.1.0
+moto[iam,sts]==5.2.2
