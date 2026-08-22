@@ -69,3 +69,46 @@ run "rejects_a_recovery_window_below_seven_days" {
 
   expect_failures = [var.recovery_window_in_days]
 }
+
+run "rejects_a_name_that_is_too_short" {
+  command = plan
+
+  variables {
+    name = "ab"
+  }
+
+  expect_failures = [var.name]
+}
+
+run "rejects_a_kms_key_arn_that_is_not_a_kms_key_arn" {
+  command = plan
+
+  variables {
+    kms_key_arn = "arn:aws:iam::111111111111:role/not-a-kms-key"
+  }
+
+  expect_failures = [var.kms_key_arn]
+}
+
+run "output_secret_arn_reflects_the_created_secret" {
+  command = apply
+
+  override_resource {
+    target = aws_secretsmanager_secret.golem
+    values = {
+      arn = "arn:aws:secretsmanager:us-east-1:111111111111:secret:golem-dev/golem-secrets-abc123"
+    }
+  }
+
+  override_resource {
+    target = aws_secretsmanager_secret_version.initial
+    values = {
+      id = "arn:aws:secretsmanager:us-east-1:111111111111:secret:golem-dev/golem-secrets-abc123|AWSCURRENT"
+    }
+  }
+
+  assert {
+    condition     = output.secret_arn == "arn:aws:secretsmanager:us-east-1:111111111111:secret:golem-dev/golem-secrets-abc123"
+    error_message = "secret_arn output must reflect the created secret's ARN"
+  }
+}
