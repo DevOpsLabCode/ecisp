@@ -68,3 +68,29 @@ run "rejects_a_name_that_is_too_short" {
 
   expect_failures = [var.name]
 }
+
+run "rejects_a_monitored_role_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    monitored_role_name = "bad role name!"
+  }
+
+  expect_failures = [var.monitored_role_name]
+}
+
+run "output_policy_arn_reflects_the_created_policy" {
+  command = apply
+
+  override_resource {
+    target = aws_iam_policy.assume_monitored_accounts
+    values = {
+      arn = "arn:aws:iam::111111111111:policy/golem-iam-responder-assume-monitored-accounts"
+    }
+  }
+
+  assert {
+    condition     = output.policy_arn == "arn:aws:iam::111111111111:policy/golem-iam-responder-assume-monitored-accounts"
+    error_message = "policy_arn output must reflect the created policy's ARN"
+  }
+}

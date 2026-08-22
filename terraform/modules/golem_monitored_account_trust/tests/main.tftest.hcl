@@ -124,3 +124,61 @@ run "rejects_a_trusted_principal_that_is_not_a_role_arn" {
 
   expect_failures = [var.trusted_principal_arn]
 }
+
+run "rejects_a_role_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    trusted_principal_arn = "arn:aws:iam::222222222222:role/golem-iam-responder-execution"
+    external_id           = "test-external-id"
+    role_name              = "bad role name!"
+  }
+
+  expect_failures = [var.role_name]
+}
+
+run "rejects_a_monitored_role_name_prefix_with_invalid_characters" {
+  command = plan
+
+  variables {
+    trusted_principal_arn      = "arn:aws:iam::222222222222:role/golem-iam-responder-execution"
+    external_id                = "test-external-id"
+    monitored_role_name_prefix = "bad prefix!"
+  }
+
+  expect_failures = [var.monitored_role_name_prefix]
+}
+
+run "output_role_arn_and_role_name_reflect_the_created_role" {
+  command = apply
+
+  variables {
+    trusted_principal_arn = "arn:aws:iam::222222222222:role/golem-iam-responder-execution"
+    external_id           = "test-external-id"
+  }
+
+  override_resource {
+    target = aws_iam_role.golem_iam_responder
+    values = {
+      arn  = "arn:aws:iam::111111111111:role/golem-iam-responder"
+      name = "golem-iam-responder"
+    }
+  }
+
+  override_resource {
+    target = aws_iam_role_policy.golem_iam_responder
+    values = {
+      id = "golem-iam-responder:golem-iam-responder-permissions"
+    }
+  }
+
+  assert {
+    condition     = output.role_arn == "arn:aws:iam::111111111111:role/golem-iam-responder"
+    error_message = "role_arn output must reflect the created role's ARN"
+  }
+
+  assert {
+    condition     = output.role_name == "golem-iam-responder"
+    error_message = "role_name output must reflect the created role's name"
+  }
+}
