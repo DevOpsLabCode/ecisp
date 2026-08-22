@@ -52,6 +52,16 @@ def _create_cluster(name: str = "prod-eks") -> tuple[str, str]:
     return body["id"], body["install_token"]
 
 
+@pytest.fixture
+def isolated_iam_key(monkeypatch):
+    # The IAM component's credential is a module-level constant read from
+    # IAM_RESPONDER_API_KEY at import time (unset in the test environment)
+    # -- override it per test so /api/iam-revocation/* has something to
+    # authenticate against, without touching real environment state.
+    monkeypatch.setattr(main, "IAM_RESPONDER_API_KEY", "test-iam-responder-key")
+    return "test-iam-responder-key"
+
+
 # ---- responder install script ------------------------------------------
 
 
@@ -365,3 +375,171 @@ def test_full_lifecycle_pending_to_applied_to_release_pending_to_released(isolat
 
     commands = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()
     assert commands == []  # "released" is terminal, no longer actionable
+
+
+# ---- revoke_iam (Tier 4) ---------------------------------------------------
+
+
+def test_ingest_enqueues_a_revoke_iam_command_when_mapped(isolated_manager, isolated_db):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    assert resp.status_code == 204
+
+    commands = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()
+    assert len(commands) == 1
+    assert commands[0]["action"] == "revoke_iam"
+    assert commands[0]["status"] == "pending"
+    assert commands[0]["resolved_role_arn"] is None
+
+
+def test_resolve_role_moves_the_command_to_role_resolved(isolated_manager, isolated_db):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role?token={token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/my-workload-role"},
+    )
+    assert resp.status_code == 204
+
+    # No longer visible to the in-cluster responder's own poll -- only to
+    # the IAM component now.
+    commands = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()
+    assert commands == []
+
+
+def test_resolve_role_rejects_wrong_cluster_token(isolated_manager, isolated_db):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+    _other_cluster_id, other_token = _create_cluster("other-cluster")
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role?token={other_token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/x"},
+    )
+    assert resp.status_code == 401
+
+
+def test_resolve_role_404_for_unknown_command(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/does-not-exist/resolve-role?token={token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/x"},
+    )
+    assert resp.status_code == 404
+
+
+def test_resolve_role_409_for_a_non_revoke_iam_command(isolated_manager, isolated_db):
+    cluster_id, token, command_id = _enqueue_one_command(isolated_manager)  # isolate_network
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role?token={token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/x"},
+    )
+    assert resp.status_code == 409
+
+
+# ---- IAM-revocation component endpoints (separate fleet-wide auth) --------
+
+
+def test_iam_revocation_endpoints_503_when_key_unconfigured(isolated_manager, isolated_db):
+    resp = client.get("/api/iam-revocation/commands", headers={"Authorization": "Bearer anything"})
+    assert resp.status_code == 503
+
+
+def test_iam_revocation_list_401_without_a_bearer_header(isolated_manager, isolated_db, isolated_iam_key):
+    resp = client.get("/api/iam-revocation/commands")
+    assert resp.status_code == 401
+
+
+def test_iam_revocation_list_401_with_wrong_key(isolated_manager, isolated_db, isolated_iam_key):
+    resp = client.get("/api/iam-revocation/commands", headers={"Authorization": "Bearer wrong-key"})
+    assert resp.status_code == 401
+
+
+def test_iam_revocation_list_is_fleet_wide_and_authenticates_with_its_own_key(
+    isolated_manager, isolated_db, isolated_iam_key
+):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_a, token_a = _create_cluster("cluster-a")
+    cluster_b, token_b = _create_cluster("cluster-b")
+    client.post(f"/api/runtime-clusters/{cluster_a}/events?token={token_a}", json=_REAL_ALERT_PAYLOAD)
+    client.post(f"/api/runtime-clusters/{cluster_b}/events?token={token_b}", json=_REAL_ALERT_PAYLOAD)
+    command_a = client.get(f"/api/runtime-clusters/{cluster_a}/commands?token={token_a}").json()[0]["id"]
+    command_b = client.get(f"/api/runtime-clusters/{cluster_b}/commands?token={token_b}").json()[0]["id"]
+    client.post(
+        f"/api/runtime-clusters/{cluster_a}/commands/{command_a}/resolve-role?token={token_a}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/a"},
+    )
+    client.post(
+        f"/api/runtime-clusters/{cluster_b}/commands/{command_b}/resolve-role?token={token_b}",
+        json={"role_arn": "arn:aws:iam::222222222222:role/b"},
+    )
+
+    resp = client.get("/api/iam-revocation/commands", headers={"Authorization": f"Bearer {isolated_iam_key}"})
+    assert resp.status_code == 200
+    ids = {c["id"] for c in resp.json()}
+    assert ids == {command_a, command_b}
+
+
+def test_iam_revocation_update_status_applies_the_command(isolated_manager, isolated_db, isolated_iam_key):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+    client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role?token={token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/x"},
+    )
+
+    resp = client.post(
+        f"/api/iam-revocation/commands/{command_id}/status",
+        headers={"Authorization": f"Bearer {isolated_iam_key}"},
+        json={"status": "applied"},
+    )
+    assert resp.status_code == 204
+
+    remaining = client.get("/api/iam-revocation/commands", headers={"Authorization": f"Bearer {isolated_iam_key}"})
+    assert remaining.json() == []
+
+
+def test_iam_revocation_update_status_404_for_unknown_command(isolated_manager, isolated_db, isolated_iam_key):
+    resp = client.post(
+        "/api/iam-revocation/commands/does-not-exist/status",
+        headers={"Authorization": f"Bearer {isolated_iam_key}"},
+        json={"status": "applied"},
+    )
+    assert resp.status_code == 404
+
+
+def test_revoke_iam_full_lifecycle_including_release(isolated_manager, isolated_db, isolated_iam_key):
+    client.post("/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "revoke_iam"})
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+
+    client.post(
+        f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role?token={token}",
+        json={"role_arn": "arn:aws:iam::111111111111:role/x"},
+    )
+    iam_auth = {"Authorization": f"Bearer {isolated_iam_key}"}
+    client.post(f"/api/iam-revocation/commands/{command_id}/status", headers=iam_auth, json={"status": "applied"})
+
+    release_resp = client.post(f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/release")
+    assert release_resp.status_code == 204
+
+    pending_release = client.get("/api/iam-revocation/commands", headers=iam_auth).json()
+    assert len(pending_release) == 1
+    assert pending_release[0]["status"] == "release_pending"
+
+    final = client.post(
+        f"/api/iam-revocation/commands/{command_id}/status", headers=iam_auth, json={"status": "released"}
+    )
+    assert final.status_code == 204
+    assert client.get("/api/iam-revocation/commands", headers=iam_auth).json() == []

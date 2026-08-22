@@ -2,7 +2,7 @@ import os
 import secrets
 import uuid
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 
@@ -30,8 +30,10 @@ from .runtimedefender.containment_store import (
     enqueue_command,
     get_response_action,
     list_actionable_commands,
+    list_commands_for_iam_component,
     list_response_rules,
     request_release,
+    resolve_iam_role,
     update_command_status,
     upsert_response_rule,
 )
@@ -56,6 +58,7 @@ from .schemas import (
     RegistryScanCreateRequest,
     RegistryScanDetail,
     RegistryScanSummary,
+    ResolveIamRoleRequest,
     ResponseCommandOut,
     ResponseRuleOut,
     ResponseRuleUpsertRequest,
@@ -96,6 +99,19 @@ DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://local
 # as configured, matching the OAuth App's own "Authorization callback URL".
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8080")
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+
+# A fleet-wide credential for the separate IAM-revocation component
+# (iam-responder/) -- deliberately NOT a per-cluster install token. Any
+# cluster's in-cluster responder authenticates with that cluster's own
+# token and can only ever see that one cluster's commands; the IAM
+# component authenticates with this single key instead and can see every
+# cluster's revoke_iam commands (see
+# containment_store.list_commands_for_iam_component) -- a different trust
+# domain entirely, matching the build plan's requirement that Tier 4 stay
+# privilege-isolated from the in-cluster responder. Left unset, every
+# /api/iam-revocation/* route refuses all requests (fail closed) rather
+# than accepting an empty key as a match for a missing one.
+IAM_RESPONDER_API_KEY = os.environ.get("IAM_RESPONDER_API_KEY", "")
 
 
 def parse_cors_origins(raw: str) -> list[str]:
@@ -691,6 +707,26 @@ def update_runtime_cluster_command_status(
     return Response(status_code=204)
 
 
+@app.post("/api/runtime-clusters/{cluster_id}/commands/{command_id}/resolve-role", status_code=204)
+def resolve_runtime_cluster_command_role(cluster_id: str, command_id: str, token: str, req: ResolveIamRoleRequest):
+    """The in-cluster responder's Tier 4 handoff: it has read the target
+    pod's ServiceAccount and resolved the IRSA role ARN using nothing but
+    its existing Kubernetes RBAC (see responder_install_script.py), and
+    reports it here. This is as far as the in-cluster responder's own
+    involvement in revoke_iam goes -- from here the command moves to
+    "role_resolved" and only the separate IAM-revocation component (see
+    /api/iam-revocation/commands below) ever acts on it."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            resolve_iam_role(session, command_id, req.role_arn, cluster_id=cluster_id)
+        except InvalidCommandTransition as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except CommandNotFound as exc:
+            raise HTTPException(status_code=404, detail="Response command not found") from exc
+    return Response(status_code=204)
+
+
 @app.post("/api/runtime-clusters/{cluster_id}/commands/{command_id}/release", status_code=204)
 def release_runtime_cluster_command(cluster_id: str, command_id: str):
     """The human-triggered reversal the build plan calls for -- an
@@ -724,3 +760,55 @@ def upsert_runtime_response_rule(req: ResponseRuleUpsertRequest):
         except UnknownResponseAction as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return rule.to_dict()
+
+
+# ---------------------------------------------------------------------
+# Tier 4: IAM revocation. This is the ONLY place a fleet-wide, cross-
+# cluster credential is checked -- every other containment route above
+# authenticates with one cluster's own install token and can only ever
+# see that one cluster's commands. The separate iam-responder/ component
+# (its own process, its own AWS credentials, no Kubernetes access at all)
+# is the sole caller of these two routes. See the containment build
+# plan's architecture diagram and containment_store.py's privilege-
+# separation notes.
+# ---------------------------------------------------------------------
+def _authenticated_iam_component(authorization: str | None) -> None:
+    if not IAM_RESPONDER_API_KEY:
+        raise HTTPException(status_code=503, detail="IAM revocation is not configured (IAM_RESPONDER_API_KEY unset)")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    provided = authorization.removeprefix("Bearer ")
+    if not secrets.compare_digest(provided, IAM_RESPONDER_API_KEY):
+        raise HTTPException(status_code=401, detail="invalid IAM responder API key")
+
+
+@app.get("/api/iam-revocation/commands", response_model=list[ResponseCommandOut])
+def list_iam_revocation_commands(authorization: str | None = Header(default=None)):
+    """Polled by iam-responder/ -- every "role_resolved" command (ready
+    for its deny-policy to be applied) and every revoke_iam
+    "release_pending" command (ready to have that policy removed), across
+    every cluster in the fleet. See
+    containment_store.list_commands_for_iam_component for why a fleet-wide
+    query here doesn't widen a compromised in-cluster responder's reach."""
+    _authenticated_iam_component(authorization)
+    with db.session_scope() as session:
+        return [c.to_dict() for c in list_commands_for_iam_component(session)]
+
+
+@app.post("/api/iam-revocation/commands/{command_id}/status", status_code=204)
+def update_iam_revocation_command_status(
+    command_id: str, req: CommandStatusUpdateRequest, authorization: str | None = Header(default=None)
+):
+    """iam-responder/'s confirmation call after acting on a command --
+    "applied"/"failed" for a fresh deny-policy attempt, "released" after
+    removing one. Not scoped to a cluster_id -- the IAM component's
+    credential is fleet-wide by design (see IAM_RESPONDER_API_KEY)."""
+    _authenticated_iam_component(authorization)
+    with db.session_scope() as session:
+        try:
+            update_command_status(session, command_id, req.status)
+        except UnknownCommandStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except CommandNotFound as exc:
+            raise HTTPException(status_code=404, detail="Response command not found") from exc
+    return Response(status_code=204)

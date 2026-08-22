@@ -214,8 +214,13 @@ class ResponseCommandOut(BaseModel):
     action: str
     status: str
     attempts: int
+    resolved_role_arn: str | None = None
     created_at: str
     updated_at: str
+
+
+class ResolveIamRoleRequest(BaseModel):
+    role_arn: str
 
 
 class CommandStatusUpdateRequest(BaseModel):

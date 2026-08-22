@@ -14,9 +14,11 @@ from app.runtimedefender.containment_store import (
     enqueue_command,
     get_response_action,
     list_actionable_commands,
+    list_commands_for_iam_component,
     list_pending_commands,
     list_response_rules,
     request_release,
+    resolve_iam_role,
     update_command_status,
     upsert_response_rule,
 )
@@ -338,3 +340,148 @@ def test_request_release_rejects_a_command_belonging_to_another_cluster(session)
 
     with pytest.raises(CommandNotFound):
         request_release(session, command.id, cluster_id="c2")
+
+
+# ---- revoke_iam (Tier 4) role resolution ---------------------------------
+
+
+def test_resolve_iam_role_moves_a_pending_command_to_role_resolved(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+
+    resolved = resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/my-workload-role")
+    session.commit()
+
+    assert resolved.status == "role_resolved"
+    assert resolved.resolved_role_arn == "arn:aws:iam::111111111111:role/my-workload-role"
+
+
+def test_resolve_iam_role_rejects_a_non_revoke_iam_command(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+
+    with pytest.raises(InvalidCommandTransition):
+        resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/my-workload-role")
+
+
+def test_resolve_iam_role_rejects_a_command_not_in_pending(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/my-workload-role")
+    session.commit()
+
+    with pytest.raises(InvalidCommandTransition):
+        resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/my-workload-role")
+
+
+def test_resolve_iam_role_rejects_a_command_belonging_to_another_cluster(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+
+    with pytest.raises(CommandNotFound):
+        resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/x", cluster_id="c2")
+
+
+def test_enqueue_command_dedupes_against_role_resolved_state(session):
+    first = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, first.id, "arn:aws:iam::111111111111:role/x")
+    session.commit()
+
+    second = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+
+    assert first.id == second.id
+
+
+# ---- Tier 4 privilege separation ------------------------------------------
+
+
+def test_list_actionable_commands_never_returns_a_pending_revoke_iam_apply_action(session):
+    # The in-cluster responder DOES see a pending revoke_iam command (it
+    # needs to resolve the role ARN), but it must never be handed anything
+    # that looks like "go ahead and apply this" for revoke_iam -- that's
+    # only ever the IAM component's job. This test documents that the
+    # command IS visible (for resolution), while the two tests below
+    # confirm the states the in-cluster responder truly must never see.
+    enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+
+    actionable = list_actionable_commands(session, "c1")
+    assert len(actionable) == 1
+    assert actionable[0].status == "pending"
+
+
+def test_list_actionable_commands_excludes_role_resolved(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/x")
+    session.commit()
+
+    assert list_actionable_commands(session, "c1") == []
+
+
+def test_list_actionable_commands_excludes_revoke_iam_release_pending(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/x")
+    update_command_status(session, command.id, "applied")
+    session.commit()
+    request_release(session, command.id)
+    session.commit()
+
+    assert command.status == "release_pending"
+    assert list_actionable_commands(session, "c1") == []
+
+
+def test_list_commands_for_iam_component_is_fleet_wide(session):
+    c1_command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    c2_command = enqueue_command(session, cluster_id="c2", namespace="default", pod_name="pod-b", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, c1_command.id, "arn:aws:iam::111111111111:role/a")
+    resolve_iam_role(session, c2_command.id, "arn:aws:iam::222222222222:role/b")
+    session.commit()
+
+    fleet_wide = list_commands_for_iam_component(session)
+    assert {c.id for c in fleet_wide} == {c1_command.id, c2_command.id}
+
+
+def test_list_commands_for_iam_component_includes_role_resolved_and_release_pending(session):
+    to_apply = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    to_release = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-b", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, to_apply.id, "arn:aws:iam::111111111111:role/a")
+    resolve_iam_role(session, to_release.id, "arn:aws:iam::111111111111:role/b")
+    update_command_status(session, to_release.id, "applied")
+    session.commit()
+    request_release(session, to_release.id)
+    session.commit()
+
+    fleet_wide = list_commands_for_iam_component(session)
+    assert {c.id for c in fleet_wide} == {to_apply.id, to_release.id}
+
+
+def test_list_commands_for_iam_component_excludes_other_actions_release_pending(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+    update_command_status(session, command.id, "applied")
+    session.commit()
+    request_release(session, command.id)
+    session.commit()
+
+    # isolate_network's release_pending belongs to the in-cluster
+    # responder, never to the IAM component.
+    assert list_commands_for_iam_component(session) == []
+
+
+def test_request_release_works_for_an_applied_revoke_iam_command(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="revoke_iam")
+    session.commit()
+    resolve_iam_role(session, command.id, "arn:aws:iam::111111111111:role/x")
+    update_command_status(session, command.id, "applied")
+    session.commit()
+
+    released = request_release(session, command.id)
+    session.commit()
+
+    assert released.status == "release_pending"

@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from .containment_models import ResponseCommand, ResponseRule
@@ -23,22 +23,28 @@ from .containment_models import ResponseCommand, ResponseRule
 # "log_only" is deliberately not enqueueable -- it exists so a rule can be
 # marked reviewed-and-intentionally-alert-only in the same table, without a
 # separate on/off flag. See the build plan's curated rule->response table.
-RESPONSE_ACTIONS = ("isolate_network", "kill_process", "quarantine_node", "log_only")
+RESPONSE_ACTIONS = ("isolate_network", "kill_process", "quarantine_node", "revoke_iam", "log_only")
 ENQUEUEABLE_ACTIONS = tuple(a for a in RESPONSE_ACTIONS if a != "log_only")
-# "release_pending" sits between an operator clicking Release and the
-# responder actually deleting the NetworkPolicy -- the responder polls for
-# it the same way it polls for "pending", then reports back "released".
-COMMAND_STATUSES = ("pending", "applied", "failed", "release_pending", "released")
-# What the in-cluster responder's poll loop acts on: apply a fresh command,
-# or reverse one an operator already released. Anything else ("applied",
-# "failed", "released") is a terminal state the responder has no more work
-# to do for.
-ACTIONABLE_STATUSES = ("pending", "release_pending")
-# Only network isolation can be released -- once a kill_process command is
-# "applied", the process is already gone; there's nothing left to reverse.
-# See the build plan: confirmation for kill_process means "we know it
-# happened," not "we can undo it."
-RELEASABLE_ACTIONS = ("isolate_network",)
+# "release_pending" sits between an operator clicking Release and a
+# responder actually reversing the action -- the in-cluster responder (for
+# isolate_network) or the IAM-revocation component (for revoke_iam) polls
+# for it the same way it polls for its own applicable pending state, then
+# reports back "released". "role_resolved" is revoke_iam-only: the point
+# where the in-cluster responder has handed off to the IAM component (see
+# resolve_iam_role) but that component hasn't acted yet.
+COMMAND_STATUSES = ("pending", "role_resolved", "applied", "failed", "release_pending", "released")
+# Actions the in-cluster responder owns end to end (apply AND, where
+# releasable, reverse) using only its Kubernetes RBAC -- no AWS access,
+# ever. revoke_iam's "pending" state is still visible to it (it resolves
+# the role ARN), but its "release_pending" state is not: reversing an IAM
+# deny-policy needs AWS credentials the in-cluster responder must never
+# hold. See the build plan's architecture diagram (no line between the
+# in-cluster responder and the IAM component).
+IN_CLUSTER_RESPONDER_ACTIONS = ("isolate_network", "kill_process", "quarantine_node")
+# isolate_network's NetworkPolicy and revoke_iam's deny-policy are both
+# clean, reversible actions -- unlike kill_process/quarantine_node, which
+# remove the offending process, there's nothing to "undo" once it's gone.
+RELEASABLE_ACTIONS = ("isolate_network", "revoke_iam")
 # quarantine_node's cordon/taint/delete chain runs as three separate
 # kubectl calls, and every one of them is safely re-runnable (cordon and
 # `taint --overwrite` are no-ops if already applied; delete tolerates an
@@ -125,8 +131,14 @@ def enqueue_command(
         raise UnknownResponseAction(f"{action!r} is not an enqueueable containment action")
 
     key = idempotency_key or f"{cluster_id}:{namespace}:{pod_name}:{action}"
+    # "role_resolved" is included alongside "pending" here -- a revoke_iam
+    # command sits in that state while waiting on the separate IAM
+    # component, and a Falco rule re-firing during that window shouldn't
+    # queue a second attempt at revoking the same role.
     existing = session.scalars(
-        select(ResponseCommand).where(ResponseCommand.idempotency_key == key, ResponseCommand.status == "pending")
+        select(ResponseCommand).where(
+            ResponseCommand.idempotency_key == key, ResponseCommand.status.in_(("pending", "role_resolved"))
+        )
     ).first()
     if existing is not None:
         return existing
@@ -160,14 +172,74 @@ def list_pending_commands(session: Session, cluster_id: str) -> list[ResponseCom
 
 
 def list_actionable_commands(session: Session, cluster_id: str) -> list[ResponseCommand]:
-    """What the responder's poll loop actually fetches: both "pending"
-    (apply) and "release_pending" (reverse) commands for its own cluster,
-    in one call -- the responder branches on each command's `status` to
-    decide which action to take. See `list_pending_commands` for the
-    apply-only view a dashboard might want instead."""
+    """What the in-cluster responder's poll loop actually fetches, scoped
+    to its own cluster: every "pending" command regardless of action
+    (including revoke_iam, which it only resolves a role ARN for -- see
+    resolve_iam_role -- never applies), plus "release_pending" *only* for
+    actions it's directly responsible for reversing
+    (`IN_CLUSTER_RESPONDER_ACTIONS`). A revoke_iam release_pending command
+    is deliberately never returned here -- that's the separate
+    IAM-revocation component's job (`list_commands_for_iam_component`),
+    and the in-cluster responder has no AWS credentials to act on it with
+    even if it saw one."""
     stmt = (
         select(ResponseCommand)
-        .where(ResponseCommand.cluster_id == cluster_id, ResponseCommand.status.in_(ACTIONABLE_STATUSES))
+        .where(
+            ResponseCommand.cluster_id == cluster_id,
+            or_(
+                ResponseCommand.status == "pending",
+                and_(
+                    ResponseCommand.status == "release_pending",
+                    ResponseCommand.action.in_(IN_CLUSTER_RESPONDER_ACTIONS),
+                ),
+            ),
+        )
+        .order_by(ResponseCommand.created_at)
+    )
+    return list(session.scalars(stmt))
+
+
+def resolve_iam_role(
+    session: Session, command_id: str, role_arn: str, *, cluster_id: str | None = None
+) -> ResponseCommand:
+    """The in-cluster responder's handoff for a revoke_iam command: it has
+    read the target pod's ServiceAccount and resolved the IRSA role ARN
+    from its `eks.amazonaws.com/role-arn` annotation using nothing but its
+    existing Kubernetes RBAC, and now hands that ARN to the separate
+    IAM-revocation component by moving the command to "role_resolved" --
+    the in-cluster responder's role in Tier 4 ends here. Only valid from
+    "pending" on a revoke_iam command."""
+    command = _get_command(session, command_id, cluster_id=cluster_id)
+    if command.action != "revoke_iam":
+        raise InvalidCommandTransition(f"{command.action!r} commands have no IAM role to resolve")
+    if command.status != "pending":
+        raise InvalidCommandTransition(f"Cannot resolve a role for a command in status {command.status!r}")
+
+    command.resolved_role_arn = role_arn
+    command.status = "role_resolved"
+    command.updated_at = _now()
+    return command
+
+
+def list_commands_for_iam_component(session: Session) -> list[ResponseCommand]:
+    """What the separate IAM-revocation component polls: every
+    "role_resolved" command (ready to have its deny-policy applied) and
+    every revoke_iam "release_pending" command (ready to have that policy
+    removed), across the *entire* fleet -- not scoped to one cluster_id,
+    unlike every other list function in this module. That's deliberate:
+    the IAM component authenticates with its own fleet-wide credential,
+    entirely separate from any cluster's install token (see main.py), so
+    it seeing every cluster's revoke_iam commands doesn't widen what a
+    compromised in-cluster responder could ever reach -- it has no path to
+    this credential at all."""
+    stmt = (
+        select(ResponseCommand)
+        .where(
+            or_(
+                ResponseCommand.status == "role_resolved",
+                and_(ResponseCommand.status == "release_pending", ResponseCommand.action == "revoke_iam"),
+            )
+        )
         .order_by(ResponseCommand.created_at)
     )
     return list(session.scalars(stmt))

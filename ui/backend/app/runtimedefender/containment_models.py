@@ -67,6 +67,15 @@ class ResponseCommand(Base):
     # cheaper and more reliable than reporting "failed" on the first
     # transient error. See update_command_status.
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Only ever set for action="revoke_iam": the IRSA role ARN the
+    # in-cluster responder resolved from the pod's ServiceAccount. The
+    # in-cluster responder resolves it (plain Kubernetes read, no AWS
+    # access); the separate IAM-revocation component is the only thing
+    # that ever acts on it -- see containment_store.py's privilege-
+    # separation notes and the containment build plan's architecture
+    # diagram (no line between the in-cluster responder and the IAM
+    # component).
+    resolved_role_arn: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -79,6 +88,7 @@ class ResponseCommand(Base):
             "action": self.action,
             "status": self.status,
             "attempts": self.attempts,
+            "resolved_role_arn": self.resolved_role_arn,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
