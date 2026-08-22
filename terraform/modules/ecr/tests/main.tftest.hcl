@@ -67,3 +67,93 @@ run "rejects_an_empty_repository_set" {
 
   expect_failures = [var.repositories]
 }
+
+run "rejects_a_repository_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    repositories = ["Backend"]
+  }
+
+  expect_failures = [var.repositories]
+}
+
+run "rejects_a_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    name = "Golem_Dev"
+  }
+
+  expect_failures = [var.name]
+}
+
+run "rejects_a_kms_key_arn_that_is_not_a_kms_key_arn" {
+  command = plan
+
+  variables {
+    kms_key_arn = "arn:aws:iam::111111111111:role/not-a-kms-key"
+  }
+
+  expect_failures = [var.kms_key_arn]
+}
+
+run "custom_retained_image_count_is_honored" {
+  command = plan
+
+  variables {
+    retained_image_count = 60
+  }
+
+  assert {
+    condition     = jsondecode(aws_ecr_lifecycle_policy.this["backend"].policy).rules[0].selection.countNumber == 60
+    error_message = "custom retained_image_count should be honored"
+  }
+}
+
+run "rejects_a_retained_image_count_above_five_hundred" {
+  command = plan
+
+  variables {
+    retained_image_count = 501
+  }
+
+  expect_failures = [var.retained_image_count]
+}
+
+run "output_repository_urls_and_arns_reflect_the_created_repositories" {
+  command = apply
+
+  override_resource {
+    target = aws_ecr_repository.this["backend"]
+    values = {
+      repository_url = "111111111111.dkr.ecr.us-east-1.amazonaws.com/golem-dev-backend"
+      arn             = "arn:aws:ecr:us-east-1:111111111111:repository/golem-dev-backend"
+    }
+  }
+
+  override_resource {
+    target = aws_ecr_repository.this["iam-responder"]
+    values = {
+      repository_url = "111111111111.dkr.ecr.us-east-1.amazonaws.com/golem-dev-iam-responder"
+      arn             = "arn:aws:ecr:us-east-1:111111111111:repository/golem-dev-iam-responder"
+    }
+  }
+
+  override_resource {
+    target = aws_ecr_lifecycle_policy.this
+    values = {
+      id = "mock-lifecycle-policy"
+    }
+  }
+
+  assert {
+    condition     = output.repository_urls["backend"] == "111111111111.dkr.ecr.us-east-1.amazonaws.com/golem-dev-backend"
+    error_message = "repository_urls output must map each repository suffix to its push/pull URL"
+  }
+
+  assert {
+    condition     = contains(output.repository_arns, "arn:aws:ecr:us-east-1:111111111111:repository/golem-dev-iam-responder")
+    error_message = "repository_arns output must contain each repository's ARN"
+  }
+}

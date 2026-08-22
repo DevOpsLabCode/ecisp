@@ -52,3 +52,52 @@ run "rejects_log_retention_below_365_days" {
 
   expect_failures = [var.log_retention_days]
 }
+
+run "rejects_a_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    name = "go!"
+  }
+
+  expect_failures = [var.name]
+}
+
+run "rejects_a_kms_key_arn_that_is_not_a_kms_key_arn" {
+  command = plan
+
+  variables {
+    kms_key_arn = "arn:aws:iam::111111111111:role/not-a-kms-key"
+  }
+
+  expect_failures = [var.kms_key_arn]
+}
+
+run "output_cluster_arn_and_name_reflect_the_created_cluster" {
+  command = apply
+
+  override_resource {
+    target = aws_ecs_cluster.this
+    values = {
+      arn  = "arn:aws:ecs:us-east-1:111111111111:cluster/golem-dev"
+      name = "golem-dev"
+    }
+  }
+
+  override_resource {
+    target = aws_cloudwatch_log_group.exec
+    values = {
+      name = "/aws/ecs/golem-dev/exec"
+    }
+  }
+
+  assert {
+    condition     = output.cluster_arn == "arn:aws:ecs:us-east-1:111111111111:cluster/golem-dev"
+    error_message = "cluster_arn output must reflect the created cluster's ARN"
+  }
+
+  assert {
+    condition     = output.cluster_name == "golem-dev"
+    error_message = "cluster_name output must reflect the created cluster's name"
+  }
+}

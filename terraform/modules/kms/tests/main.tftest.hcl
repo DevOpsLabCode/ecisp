@@ -92,3 +92,46 @@ run "rejects_an_empty_name" {
 
   expect_failures = [var.name]
 }
+
+run "rejects_a_name_with_invalid_characters" {
+  command = plan
+
+  variables {
+    name = "golem dev!"
+  }
+
+  expect_failures = [var.name]
+}
+
+run "output_key_arn_and_key_id_reflect_the_created_key" {
+  command = apply
+
+  variables {
+    name = "golem-dev"
+  }
+
+  override_resource {
+    target = aws_kms_key.this
+    values = {
+      arn    = "arn:aws:kms:us-east-1:111111111111:key/mock-key-id"
+      key_id = "mock-key-id"
+    }
+  }
+
+  override_resource {
+    target = aws_kms_alias.this
+    values = {
+      id = "alias/golem-dev"
+    }
+  }
+
+  assert {
+    condition     = output.key_arn == "arn:aws:kms:us-east-1:111111111111:key/mock-key-id"
+    error_message = "key_arn output must reflect the created key's ARN"
+  }
+
+  assert {
+    condition     = output.key_id == "mock-key-id"
+    error_message = "key_id output must reflect the created key's ID"
+  }
+}
