@@ -65,16 +65,15 @@ def init_db(bind: Engine | None = None) -> None:
     safe to call even against a deployment that already applied schema via
     `alembic upgrade head` (see `alembic/`), which is still the only path
     that can carry a schema *forward* across releases; this function only
-    ever creates the current shape from scratch."""
+    ever creates the current shape from scratch.
+
+    Deliberately NOT called automatically at the bottom of this module --
+    `alembic/env.py` imports `Base` from here to get at the ORM metadata,
+    and an eager call here would run before Alembic's own migration does,
+    leaving Alembic to fail on "table already exists" the very first time
+    `alembic upgrade head` runs against a fresh database. `main.py` calls
+    this once at its own import time instead, which Alembic's env.py never
+    imports -- see the call there for why."""
     from .runtimedefender import containment_models  # noqa: F401 -- registers tables on Base.metadata
 
     Base.metadata.create_all(bind=bind or engine)
-
-
-# Run once, at import time, against the module-level `engine` -- so a bare
-# `uvicorn app.main:app` (local dev, this app's own test suite, the CI perf
-# job that starts uvicorn directly) never needs a separate migration step
-# against its default SQLite DB. FastAPI's own startup hooks don't fire for
-# the way this app's test suite constructs `TestClient(app)` (without the
-# `with` form), so this can't be a startup-event side effect instead.
-init_db()

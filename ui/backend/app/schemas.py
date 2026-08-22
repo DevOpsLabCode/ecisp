@@ -213,6 +213,7 @@ class ResponseCommandOut(BaseModel):
     pod_name: str
     action: str
     status: str
+    attempts: int
     created_at: str
     updated_at: str
 

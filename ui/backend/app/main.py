@@ -73,6 +73,16 @@ app = FastAPI(
     contact={"name": "Stan Zvenigorodskiy", "url": "https://devopslabinc.com"},
 )
 
+# Idempotent (create_all only creates tables that don't already exist) --
+# safe even against a deployment that already applied schema via `alembic
+# upgrade head` (see the Dockerfile's CMD). Lives here rather than at
+# db.py's own import time so that importing *just* app.db (as alembic/
+# env.py does, to get at Base's metadata) never triggers it -- otherwise
+# Alembic's own migration would find its tables already created out from
+# under it. This module is never imported by alembic/env.py, only by
+# uvicorn and this app's test suite (see db.py's init_db docstring).
+db.init_db()
+
 # Defaults cover the Vite dev server (`npm run dev`) and the default
 # docker-compose port for the built frontend. Override with a comma-
 # separated CORS_ORIGINS env var for any other deployment -- the frontend

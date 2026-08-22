@@ -329,6 +329,26 @@ def test_release_rejects_an_applied_quarantine_node_command(isolated_manager, is
     assert resp.status_code == 409
 
 
+def test_a_failed_quarantine_node_attempt_stays_pollable_and_counts_attempts(isolated_manager, isolated_db):
+    # A transient failure on this multi-step action retries automatically
+    # rather than going straight to a terminal "failed" -- see
+    # containment_store.RETRYABLE_ACTIONS.
+    client.post(
+        "/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "quarantine_node"}
+    )
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+
+    resp = _update_status(cluster_id, token, command_id, "failed")
+    assert resp.status_code == 204
+
+    commands = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()
+    assert len(commands) == 1
+    assert commands[0]["status"] == "pending"
+    assert commands[0]["attempts"] == 1
+
+
 def test_release_404_for_unknown_command(isolated_manager, isolated_db):
     cluster_id, _token = _create_cluster()
     resp = client.post(f"/api/runtime-clusters/{cluster_id}/commands/does-not-exist/release")

@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 from app.db import Base
 from app.runtimedefender import containment_models  # noqa: F401 -- registers tables on Base.metadata
 from app.runtimedefender.containment_store import (
+    MAX_APPLY_ATTEMPTS,
     CommandNotFound,
     InvalidCommandTransition,
     UnknownCommandStatus,
@@ -167,6 +168,56 @@ def test_update_command_status_rejects_unknown_status(session):
 
     with pytest.raises(UnknownCommandStatus):
         update_command_status(session, command.id, "obliterated")
+
+
+def test_update_command_status_immediate_terminal_failure_for_non_retryable_action(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+
+    updated = update_command_status(session, command.id, "failed")
+    session.commit()
+
+    assert updated.status == "failed"
+    assert updated.attempts == 0  # non-retryable actions don't use the counter at all
+
+
+def test_update_command_status_failed_for_retryable_action_stays_pending_and_counts_attempts(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="quarantine_node")
+    session.commit()
+
+    updated = update_command_status(session, command.id, "failed")
+    session.commit()
+
+    assert updated.status == "pending"  # unchanged -- next poll retries
+    assert updated.attempts == 1
+
+
+def test_update_command_status_goes_terminal_after_max_apply_attempts(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="quarantine_node")
+    session.commit()
+
+    for _ in range(MAX_APPLY_ATTEMPTS - 1):
+        update_command_status(session, command.id, "failed")
+        session.commit()
+        assert command.status == "pending"
+
+    updated = update_command_status(session, command.id, "failed")
+    session.commit()
+
+    assert updated.attempts == MAX_APPLY_ATTEMPTS
+    assert updated.status == "failed"
+
+
+def test_update_command_status_applied_for_retryable_action_still_goes_terminal(session):
+    # A success report is a plain terminal transition regardless of action
+    # -- the retry counter only intercepts "failed" reports.
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="quarantine_node")
+    session.commit()
+
+    updated = update_command_status(session, command.id, "applied")
+    session.commit()
+
+    assert updated.status == "applied"
 
 
 def test_update_command_status_raises_for_unknown_command_id(session):

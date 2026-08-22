@@ -208,7 +208,8 @@ spec:
                     fi
 
                   elif [ "${status}" = "pending" ] && [ "${action}" = "kill_process" ]; then
-                    if kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force >/dev/null 2>&1; then
+                    if kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force \\
+                      --ignore-not-found >/dev/null 2>&1; then
                       report_status "applied" "${id}"
                     else
                       report_status "failed" "${id}"
@@ -220,9 +221,14 @@ spec:
                       && kubectl cordon "${node}" >/dev/null 2>&1 \\
                       && kubectl taint nodes "${node}" "golem.io/quarantined=${id}:NoSchedule" \\
                         --overwrite >/dev/null 2>&1 \\
-                      && kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force >/dev/null 2>&1; then
+                      && kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force \\
+                        --ignore-not-found >/dev/null 2>&1; then
                       report_status "applied" "${id}"
                     else
+                      # quarantine_node retries automatically (see
+                      # containment_store.RETRYABLE_ACTIONS) -- this
+                      # "failed" report may just increment an attempt
+                      # counter server-side rather than going terminal.
                       report_status "failed" "${id}"
                     fi
 

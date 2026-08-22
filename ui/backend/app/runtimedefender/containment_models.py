@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db import Base
@@ -60,6 +60,13 @@ class ResponseCommand(Base):
     # second isolation command for a pod that's already being handled --
     # see the build plan's confirmation/reversal flow.
     idempotency_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
+    # Only meaningful for RETRYABLE_ACTIONS (containment_store.py) --
+    # quarantine_node's cordon/taint/delete chain can fail partway through
+    # (e.g. cordon succeeds, taint doesn't), and every step in that chain
+    # is safely re-runnable, so a bounded number of automatic retries is
+    # cheaper and more reliable than reporting "failed" on the first
+    # transient error. See update_command_status.
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -71,6 +78,7 @@ class ResponseCommand(Base):
             "pod_name": self.pod_name,
             "action": self.action,
             "status": self.status,
+            "attempts": self.attempts,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }

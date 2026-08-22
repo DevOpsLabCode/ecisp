@@ -39,6 +39,15 @@ ACTIONABLE_STATUSES = ("pending", "release_pending")
 # See the build plan: confirmation for kill_process means "we know it
 # happened," not "we can undo it."
 RELEASABLE_ACTIONS = ("isolate_network",)
+# quarantine_node's cordon/taint/delete chain runs as three separate
+# kubectl calls, and every one of them is safely re-runnable (cordon and
+# `taint --overwrite` are no-ops if already applied; delete tolerates an
+# already-gone pod) -- so a transient failure partway through is worth
+# retrying automatically rather than reporting "failed" on the first
+# attempt. isolate_network and kill_process are single kubectl calls each;
+# there's no partial state to retry into, so they stay report-once.
+RETRYABLE_ACTIONS = ("quarantine_node",)
+MAX_APPLY_ATTEMPTS = 5
 
 
 class UnknownResponseAction(ValueError):
@@ -183,11 +192,28 @@ def update_command_status(
     """The responder's confirmation call ("applied" / "failed" /
     "released") -- see the build plan's confirmation + reversal flow,
     Phase 1. Not for requesting a release -- see `request_release`, which
-    enforces that only an "applied" command can be released."""
+    enforces that only an "applied" command can be released.
+
+    A "failed" report for a `RETRYABLE_ACTIONS` command doesn't go
+    terminal immediately: it increments `attempts` and leaves `status`
+    untouched (still "pending"), so the responder's next poll picks the
+    same command back up and retries the whole chain -- safe, because
+    every step of it is idempotent. Only once `attempts` reaches
+    `MAX_APPLY_ATTEMPTS` does it actually become "failed", so a genuinely
+    broken cluster (bad RBAC, API server down) still surfaces rather than
+    retrying silently forever."""
     if status not in COMMAND_STATUSES:
         raise UnknownCommandStatus(f"Unknown command status {status!r}, expected one of {COMMAND_STATUSES}")
 
     command = _get_command(session, command_id, cluster_id=cluster_id)
+
+    if status == "failed" and command.action in RETRYABLE_ACTIONS:
+        command.attempts += 1
+        command.updated_at = _now()
+        if command.attempts >= MAX_APPLY_ATTEMPTS:
+            command.status = "failed"
+        return command
+
     command.status = status
     command.updated_at = _now()
     return command
