@@ -225,3 +225,15 @@ class ResolveIamRoleRequest(BaseModel):
 
 class CommandStatusUpdateRequest(BaseModel):
     status: str
+
+
+class ClusterCoverageOut(BaseModel):
+    cluster_id: str
+    responder_last_seen_at: str | None = None
+    network_policy_enforcement: str
+    network_policy_checked_at: str | None = None
+    updated_at: str
+
+
+class NetworkPolicyCoverageReportRequest(BaseModel):
+    status: str

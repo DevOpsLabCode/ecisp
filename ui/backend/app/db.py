@@ -74,6 +74,6 @@ def init_db(bind: Engine | None = None) -> None:
     `alembic upgrade head` runs against a fresh database. `main.py` calls
     this once at its own import time instead, which Alembic's env.py never
     imports -- see the call there for why."""
-    from .runtimedefender import containment_models  # noqa: F401 -- registers tables on Base.metadata
+    from .runtimedefender import containment_models, coverage_models  # noqa: F401 -- registers tables
 
     Base.metadata.create_all(bind=bind or engine)

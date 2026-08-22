@@ -37,6 +37,13 @@ from .runtimedefender.containment_store import (
     update_command_status,
     upsert_response_rule,
 )
+from .runtimedefender.coverage_store import (
+    UnknownCoverageStatus,
+    get_cluster_coverage,
+    list_cluster_coverage,
+    record_responder_heartbeat,
+    report_network_policy_enforcement,
+)
 from .runtimedefender.falco_ingest import parse_falco_alert
 from .runtimedefender.install_script import build_install_script
 from .runtimedefender.responder_install_script import build_responder_install_script
@@ -45,6 +52,7 @@ from .runtimedefender.runtime_defender import manager as runtime_defender_manage
 from .schemas import (
     BatchDetail,
     BatchSummary,
+    ClusterCoverageOut,
     CodeScanDetail,
     CodeScanFromRepoRequest,
     CodeScanSummary,
@@ -52,6 +60,7 @@ from .schemas import (
     DastRequest,
     JobDetail,
     JobSummary,
+    NetworkPolicyCoverageReportRequest,
     OrgScanCreateRequest,
     OrgScanDetail,
     OrgScanSummary,
@@ -681,9 +690,16 @@ def list_runtime_cluster_commands(cluster_id: str, token: str):
     cluster's actionable commands (pending to apply, release_pending to
     reverse), never any other cluster's. See the build plan's
     architecture: the backend never reaches into a cluster, the responder
-    always reaches out to it."""
+    always reaches out to it.
+
+    Doubles as the responder heartbeat (see coverage_store.py, Phase 2)
+    -- every successful poll updates this cluster's
+    responder_last_seen_at, the cheapest coverage signal there is, since
+    the responder already has to poll regularly for containment to work
+    at all."""
     _authenticated_cluster(cluster_id, token)
     with db.session_scope() as session:
+        record_responder_heartbeat(session, cluster_id)
         commands = list_actionable_commands(session, cluster_id)
         return [c.to_dict() for c in commands]
 
@@ -812,3 +828,48 @@ def update_iam_revocation_command_status(
         except CommandNotFound as exc:
             raise HTTPException(status_code=404, detail="Response command not found") from exc
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------
+# Phase 2: coverage. "Tier 1 is configured" and "Tier 1 actually works on
+# this cluster" are different claims -- EKS's default VPC CNI doesn't
+# enforce NetworkPolicy at all unless explicitly turned on, so an
+# isolation command can apply cleanly and do nothing. This section is
+# what keeps those claims distinct; see coverage_store.py.
+# ---------------------------------------------------------------------
+@app.post("/api/runtime-clusters/{cluster_id}/coverage/network-policy", status_code=204)
+def report_runtime_cluster_network_policy_coverage(
+    cluster_id: str, token: str, req: NetworkPolicyCoverageReportRequest
+):
+    """Reported by the daily canary CronJob (see
+    responder_install_script.py) -- never inferred from Tier 1 being
+    configured, only ever written by an actual test result: a deny-all
+    policy applied to a throwaway pod, and a probe confirming traffic was
+    actually blocked."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            report_network_policy_enforcement(session, cluster_id, req.status)
+        except UnknownCoverageStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@app.get("/api/runtime-clusters/{cluster_id}/coverage", response_model=ClusterCoverageOut)
+def get_runtime_cluster_coverage(cluster_id: str):
+    with db.session_scope() as session:
+        coverage = get_cluster_coverage(session, cluster_id)
+        if coverage is None:
+            raise HTTPException(status_code=404, detail="No coverage data for this cluster yet")
+        return coverage.to_dict()
+
+
+@app.get("/api/coverage", response_model=list[ClusterCoverageOut])
+def list_runtime_coverage():
+    """The fleet-wide capability matrix -- read-only, unauthenticated
+    like the rest of this app's dashboard routes (see
+    coverage_store.list_cluster_coverage for why a fleet-wide read here
+    doesn't carry the same privilege-separation concern
+    list_commands_for_iam_component does)."""
+    with db.session_scope() as session:
+        return [c.to_dict() for c in list_cluster_coverage(session)]

@@ -4,11 +4,11 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Importing containment_models (not just app.db) is what actually registers
-# ResponseRule/ResponseCommand on Base.metadata -- db.py itself never
-# imports the models eagerly, to avoid a circular import (see its docstring).
+# Importing these model modules (not just app.db) is what actually
+# registers their tables on Base.metadata -- db.py itself never imports
+# them eagerly, to avoid a circular import (see its docstring).
 from app.db import DATABASE_URL, Base
-from app.runtimedefender import containment_models  # noqa: F401
+from app.runtimedefender import containment_models, coverage_models  # noqa: F401
 
 config = context.config
 
