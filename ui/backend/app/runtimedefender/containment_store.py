@@ -5,9 +5,9 @@ own the transaction boundary (an API route commits once per request via
 module a plain function library instead of a second place session lifetime
 gets decided.
 
-No HTTP routes call into this yet -- that's the in-cluster responder work
-that follows Phase 0 (see the containment build plan). This module is the
-storage foundation that work builds on, kept independently testable now.
+Wired into `main.py`'s ingest route (queues a command when a Falco rule is
+mapped) and into the new `/commands` / `/response-rules` routes the
+in-cluster responder polls -- see the containment build plan's Phase 1.
 """
 
 from __future__ import annotations
@@ -25,7 +25,15 @@ from .containment_models import ResponseCommand, ResponseRule
 # separate on/off flag. See the build plan's curated rule->response table.
 RESPONSE_ACTIONS = ("isolate_network", "kill_process", "quarantine_node", "log_only")
 ENQUEUEABLE_ACTIONS = tuple(a for a in RESPONSE_ACTIONS if a != "log_only")
-COMMAND_STATUSES = ("pending", "applied", "failed", "released")
+# "release_pending" sits between an operator clicking Release and the
+# responder actually deleting the NetworkPolicy -- the responder polls for
+# it the same way it polls for "pending", then reports back "released".
+COMMAND_STATUSES = ("pending", "applied", "failed", "release_pending", "released")
+# What the in-cluster responder's poll loop acts on: apply a fresh command,
+# or reverse one an operator already released. Anything else ("applied",
+# "failed", "released") is a terminal state the responder has no more work
+# to do for.
+ACTIONABLE_STATUSES = ("pending", "release_pending")
 
 
 class UnknownResponseAction(ValueError):
@@ -38,6 +46,12 @@ class UnknownCommandStatus(ValueError):
 
 class CommandNotFound(LookupError):
     pass
+
+
+class InvalidCommandTransition(ValueError):
+    """Raised when an operation is attempted from a command status it
+    doesn't make sense from -- e.g. releasing a command that was never
+    applied."""
 
 
 def _now() -> datetime:
@@ -131,17 +145,62 @@ def list_pending_commands(session: Session, cluster_id: str) -> list[ResponseCom
     return list(session.scalars(stmt))
 
 
-def update_command_status(session: Session, command_id: str, status: str) -> ResponseCommand:
-    """The responder's confirmation call ("applied" / "failed") and an
-    operator's explicit reversal ("released") both land here -- see the
-    build plan's confirmation + reversal flow, Phase 1."""
+def list_actionable_commands(session: Session, cluster_id: str) -> list[ResponseCommand]:
+    """What the responder's poll loop actually fetches: both "pending"
+    (apply) and "release_pending" (reverse) commands for its own cluster,
+    in one call -- the responder branches on each command's `status` to
+    decide which action to take. See `list_pending_commands` for the
+    apply-only view a dashboard might want instead."""
+    stmt = (
+        select(ResponseCommand)
+        .where(ResponseCommand.cluster_id == cluster_id, ResponseCommand.status.in_(ACTIONABLE_STATUSES))
+        .order_by(ResponseCommand.created_at)
+    )
+    return list(session.scalars(stmt))
+
+
+def _get_command(session: Session, command_id: str, *, cluster_id: str | None = None) -> ResponseCommand:
+    """`cluster_id`, when given, scopes the lookup to its owning cluster --
+    a valid token for cluster A must never be able to act on cluster B's
+    command, even by guessing or leaking its id (ids are opaque uuid4 hex,
+    but this is cheap to enforce properly rather than lean on that alone).
+    A mismatch is indistinguishable from "doesn't exist" to the caller, so
+    this never leaks whether the id exists in another cluster."""
+    command = session.get(ResponseCommand, command_id)
+    if command is None or (cluster_id is not None and command.cluster_id != cluster_id):
+        raise CommandNotFound(f"No response command with id {command_id!r}")
+    return command
+
+
+def update_command_status(
+    session: Session, command_id: str, status: str, *, cluster_id: str | None = None
+) -> ResponseCommand:
+    """The responder's confirmation call ("applied" / "failed" /
+    "released") -- see the build plan's confirmation + reversal flow,
+    Phase 1. Not for requesting a release -- see `request_release`, which
+    enforces that only an "applied" command can be released."""
     if status not in COMMAND_STATUSES:
         raise UnknownCommandStatus(f"Unknown command status {status!r}, expected one of {COMMAND_STATUSES}")
 
-    command = session.get(ResponseCommand, command_id)
-    if command is None:
-        raise CommandNotFound(f"No response command with id {command_id!r}")
-
+    command = _get_command(session, command_id, cluster_id=cluster_id)
     command.status = status
+    command.updated_at = _now()
+    return command
+
+
+def request_release(session: Session, command_id: str, *, cluster_id: str | None = None) -> ResponseCommand:
+    """The human-triggered reversal the build plan calls for: an operator
+    releasing an isolation. Only valid from "applied" -- a command that
+    never got applied (still "pending", or "failed") has nothing to
+    reverse. The responder picks up "release_pending" on its next poll,
+    deletes the NetworkPolicy, and reports back "released" via
+    `update_command_status`."""
+    command = _get_command(session, command_id, cluster_id=cluster_id)
+    if command.status != "applied":
+        raise InvalidCommandTransition(
+            f"Cannot release a command in status {command.status!r} -- only an 'applied' command can be released"
+        )
+
+    command.status = "release_pending"
     command.updated_at = _now()
     return command

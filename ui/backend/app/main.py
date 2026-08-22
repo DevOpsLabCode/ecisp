@@ -1,11 +1,12 @@
 import os
+import secrets
 import uuid
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 
-from . import engine_runner
+from . import db, engine_runner
 from .batch_import import RowParseError, csv_template_text
 from .batches import batch_manager
 from .codescan import github_oauth
@@ -20,7 +21,23 @@ from .orgscan.reporting import sarif as sarif_report
 from .providers_meta import list_providers
 from .registryscan.registry_scan_job import manager as registry_scan_manager
 from .runtimedefender.attack_simulation_script import build_simulation_script
+from .runtimedefender.containment_store import (
+    ENQUEUEABLE_ACTIONS,
+    CommandNotFound,
+    InvalidCommandTransition,
+    UnknownCommandStatus,
+    UnknownResponseAction,
+    enqueue_command,
+    get_response_action,
+    list_actionable_commands,
+    list_response_rules,
+    request_release,
+    update_command_status,
+    upsert_response_rule,
+)
+from .runtimedefender.falco_ingest import parse_falco_alert
 from .runtimedefender.install_script import build_install_script
+from .runtimedefender.responder_install_script import build_responder_install_script
 from .runtimedefender.runtime_defender import ClusterNotFound, InvalidInstallToken, MalformedFalcoAlert
 from .runtimedefender.runtime_defender import manager as runtime_defender_manager
 from .schemas import (
@@ -29,6 +46,7 @@ from .schemas import (
     CodeScanDetail,
     CodeScanFromRepoRequest,
     CodeScanSummary,
+    CommandStatusUpdateRequest,
     DastRequest,
     JobDetail,
     JobSummary,
@@ -38,6 +56,9 @@ from .schemas import (
     RegistryScanCreateRequest,
     RegistryScanDetail,
     RegistryScanSummary,
+    ResponseCommandOut,
+    ResponseRuleOut,
+    ResponseRuleUpsertRequest,
     RuntimeClusterCreateRequest,
     RuntimeClusterDetail,
     RuntimeClusterSummary,
@@ -521,14 +542,50 @@ async def ingest_runtime_cluster_event(cluster_id: str, request: Request, token:
         raise HTTPException(status_code=400, detail="request body is not valid JSON") from exc
 
     try:
-        runtime_defender_manager.ingest_event(cluster_id, token, payload)
+        finding = runtime_defender_manager.ingest_event(cluster_id, token, payload)
     except ClusterNotFound as exc:
         raise HTTPException(status_code=404, detail="Runtime cluster not found") from exc
     except InvalidInstallToken as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     except MalformedFalcoAlert as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    _maybe_enqueue_containment_response(cluster_id, finding.rule_id, payload)
     return Response(status_code=204)
+
+
+def _maybe_enqueue_containment_response(cluster_id: str, rule_id: str, payload: dict) -> None:
+    """If this Falco rule is opted into an automated response (see
+    `containment_store.upsert_response_rule`), queues the command for the
+    in-cluster responder to pick up on its next poll. The vast majority of
+    rules have no mapping and this is a no-op -- unmapped rules only ever
+    alert, exactly as before Phase 1.
+
+    Re-parses the payload rather than threading pod_name/namespace through
+    `RuntimeDefenderManager.ingest_event`'s return value, which stays a
+    plain `Finding` -- unchanged from before Phase 1, so its own tests
+    don't need to know containment exists. `parse_falco_alert` is pure and
+    cheap, and this call is guaranteed to succeed: `ingest_event` above
+    already parsed this exact payload successfully once.
+    """
+    with db.session_scope() as session:
+        action = get_response_action(session, rule_id)
+        if action not in ENQUEUEABLE_ACTIONS:
+            return  # unmapped, disabled, or "log_only" -- nothing to enqueue
+
+        cluster = runtime_defender_manager.get(cluster_id)
+        cluster_label = cluster.name if cluster else cluster_id
+        alert = parse_falco_alert(payload, cluster_label=cluster_label)
+        if not alert.pod_name or not alert.namespace:
+            return  # nothing to isolate without a resolved pod/namespace
+
+        enqueue_command(
+            session,
+            cluster_id=cluster_id,
+            namespace=alert.namespace,
+            pod_name=alert.pod_name,
+            action=action,
+        )
 
 
 @app.get("/api/runtime-clusters/{cluster_id}/report.{fmt}")
@@ -563,3 +620,97 @@ def get_runtime_cluster_report(cluster_id: str, fmt: str):
         media_type=_REPORT_MEDIA_TYPES[fmt],
         headers={"Content-Disposition": f'attachment; filename="{_REPORT_FILENAMES[fmt]}"'},
     )
+
+
+# ---------------------------------------------------------------------
+# Runtime Defender containment -- Phase 1: an operator opts specific Falco
+# rules into an automated response (below), and the in-cluster responder
+# (installed via responder-install.sh) polls for and reports on the
+# resulting commands. See the containment build plan.
+# ---------------------------------------------------------------------
+@app.get("/api/runtime-clusters/{cluster_id}/responder-install.sh")
+def get_runtime_cluster_responder_install_script(cluster_id: str):
+    cluster = runtime_defender_manager.get(cluster_id)
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    script = build_responder_install_script(cluster.id, cluster.name, cluster.install_token, BACKEND_URL)
+    return PlainTextResponse(script, media_type="text/x-shellscript")
+
+
+def _authenticated_cluster(cluster_id: str, token: str):
+    """Same check `RuntimeDefenderManager.ingest_event` makes for the
+    Falco webhook path -- the responder authenticates with the identical
+    per-cluster install token, no separate credential type introduced."""
+    cluster = runtime_defender_manager.get(cluster_id)
+    if cluster is None:
+        raise HTTPException(status_code=404, detail="Runtime cluster not found")
+    if not secrets.compare_digest(token, cluster.install_token):
+        raise HTTPException(status_code=401, detail="install token does not match this cluster")
+    return cluster
+
+
+@app.get("/api/runtime-clusters/{cluster_id}/commands", response_model=list[ResponseCommandOut])
+def list_runtime_cluster_commands(cluster_id: str, token: str):
+    """Polled by the in-cluster responder -- returns exactly this
+    cluster's actionable commands (pending to apply, release_pending to
+    reverse), never any other cluster's. See the build plan's
+    architecture: the backend never reaches into a cluster, the responder
+    always reaches out to it."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        commands = list_actionable_commands(session, cluster_id)
+        return [c.to_dict() for c in commands]
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/commands/{command_id}/status", status_code=204)
+def update_runtime_cluster_command_status(
+    cluster_id: str, command_id: str, token: str, req: CommandStatusUpdateRequest
+):
+    """The responder's confirmation call after acting on a command --
+    "applied"/"failed" for a fresh isolation attempt, "released" after
+    reversing one. `cluster_id` scopes the lookup so a cluster's token can
+    never be used to touch another cluster's command."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            update_command_status(session, command_id, req.status, cluster_id=cluster_id)
+        except UnknownCommandStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except CommandNotFound as exc:
+            raise HTTPException(status_code=404, detail="Response command not found") from exc
+    return Response(status_code=204)
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/commands/{command_id}/release", status_code=204)
+def release_runtime_cluster_command(cluster_id: str, command_id: str):
+    """The human-triggered reversal the build plan calls for -- an
+    operator releasing an isolation from the dashboard. Only valid from
+    "applied"; the responder picks up "release_pending" on its next poll
+    and actually deletes the NetworkPolicy."""
+    with db.session_scope() as session:
+        try:
+            request_release(session, command_id, cluster_id=cluster_id)
+        except InvalidCommandTransition as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except CommandNotFound as exc:
+            raise HTTPException(status_code=404, detail="Response command not found") from exc
+    return Response(status_code=204)
+
+
+@app.get("/api/response-rules", response_model=list[ResponseRuleOut])
+def list_runtime_response_rules():
+    with db.session_scope() as session:
+        return [r.to_dict() for r in list_response_rules(session)]
+
+
+@app.post("/api/response-rules", response_model=ResponseRuleOut)
+def upsert_runtime_response_rule(req: ResponseRuleUpsertRequest):
+    """An operator opting one Falco rule into an automated response (or
+    updating/disabling an existing mapping) -- the sole opt-in mechanism
+    for everything Phase 1 does. A rule with no row here only ever alerts."""
+    with db.session_scope() as session:
+        try:
+            rule = upsert_response_rule(session, req.rule_id, req.action, enabled=req.enabled)
+        except UnknownResponseAction as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return rule.to_dict()

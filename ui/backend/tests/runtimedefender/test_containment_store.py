@@ -7,12 +7,15 @@ from app.db import Base
 from app.runtimedefender import containment_models  # noqa: F401 -- registers tables on Base.metadata
 from app.runtimedefender.containment_store import (
     CommandNotFound,
+    InvalidCommandTransition,
     UnknownCommandStatus,
     UnknownResponseAction,
     enqueue_command,
     get_response_action,
+    list_actionable_commands,
     list_pending_commands,
     list_response_rules,
+    request_release,
     update_command_status,
     upsert_response_rule,
 )
@@ -169,3 +172,96 @@ def test_update_command_status_rejects_unknown_status(session):
 def test_update_command_status_raises_for_unknown_command_id(session):
     with pytest.raises(CommandNotFound):
         update_command_status(session, "does-not-exist", "applied")
+
+
+# ---- release flow -----------------------------------------------------
+
+
+def test_request_release_moves_an_applied_command_to_release_pending(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+    update_command_status(session, command.id, "applied")
+    session.commit()
+
+    released = request_release(session, command.id)
+    session.commit()
+
+    assert released.status == "release_pending"
+
+
+def test_request_release_rejects_a_command_that_was_never_applied(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+
+    with pytest.raises(InvalidCommandTransition):
+        request_release(session, command.id)
+
+
+def test_request_release_raises_for_unknown_command_id(session):
+    with pytest.raises(CommandNotFound):
+        request_release(session, "does-not-exist")
+
+
+def test_list_actionable_commands_includes_pending_and_release_pending(session):
+    to_apply = enqueue_command(
+        session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network"
+    )
+    to_release = enqueue_command(
+        session, cluster_id="c1", namespace="default", pod_name="pod-b", action="isolate_network"
+    )
+    session.commit()
+    update_command_status(session, to_release.id, "applied")
+    session.commit()
+    request_release(session, to_release.id)
+    session.commit()
+
+    actionable = list_actionable_commands(session, "c1")
+    assert {c.id for c in actionable} == {to_apply.id, to_release.id}
+
+
+def test_list_actionable_commands_excludes_terminal_states(session):
+    applied = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    failed = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-b", action="isolate_network")
+    session.commit()
+    update_command_status(session, applied.id, "applied")
+    update_command_status(session, failed.id, "failed")
+    session.commit()
+
+    assert list_actionable_commands(session, "c1") == []
+
+
+def test_list_actionable_commands_is_scoped_to_one_cluster(session):
+    enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    enqueue_command(session, cluster_id="c2", namespace="default", pod_name="pod-b", action="isolate_network")
+    session.commit()
+
+    assert [c.cluster_id for c in list_actionable_commands(session, "c1")] == ["c1"]
+
+
+# ---- cross-cluster ownership scoping -----------------------------------
+
+
+def test_update_command_status_rejects_a_command_belonging_to_another_cluster(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+
+    with pytest.raises(CommandNotFound):
+        update_command_status(session, command.id, "applied", cluster_id="c2")
+
+
+def test_update_command_status_succeeds_when_cluster_id_matches(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+
+    updated = update_command_status(session, command.id, "applied", cluster_id="c1")
+    assert updated.status == "applied"
+
+
+def test_request_release_rejects_a_command_belonging_to_another_cluster(session):
+    command = enqueue_command(session, cluster_id="c1", namespace="default", pod_name="pod-a", action="isolate_network")
+    session.commit()
+    update_command_status(session, command.id, "applied")
+    session.commit()
+
+    with pytest.raises(CommandNotFound):
+        request_release(session, command.id, cluster_id="c2")

@@ -60,13 +60,21 @@ def session_scope(factory: sessionmaker | None = None) -> Iterator[Session]:
 
 
 def init_db(bind: Engine | None = None) -> None:
-    """Creates tables directly from the ORM metadata. Used by local dev
-    (app startup, see `main.py`) and by the test suite against a throwaway
-    SQLite engine -- neither needs Alembic run first. A real deployment
-    instead applies schema via `alembic upgrade head` (see `alembic/`),
-    which is the only path that can also carry a schema forward across
-    releases; this function only ever creates the current shape from
-    scratch."""
+    """Creates tables directly from the ORM metadata -- idempotent
+    (`create_all` only creates tables that don't already exist), so this is
+    safe to call even against a deployment that already applied schema via
+    `alembic upgrade head` (see `alembic/`), which is still the only path
+    that can carry a schema *forward* across releases; this function only
+    ever creates the current shape from scratch."""
     from .runtimedefender import containment_models  # noqa: F401 -- registers tables on Base.metadata
 
     Base.metadata.create_all(bind=bind or engine)
+
+
+# Run once, at import time, against the module-level `engine` -- so a bare
+# `uvicorn app.main:app` (local dev, this app's own test suite, the CI perf
+# job that starts uvicorn directly) never needs a separate migration step
+# against its default SQLite DB. FastAPI's own startup hooks don't fire for
+# the way this app's test suite constructs `TestClient(app)` (without the
+# `with` form), so this can't be a startup-event side effect instead.
+init_db()

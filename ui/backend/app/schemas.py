@@ -190,3 +190,32 @@ class RuntimeClusterSummary(BaseModel):
 class RuntimeClusterDetail(RuntimeClusterSummary):
     install_token: str
     findings: list[FindingOut]
+
+
+class ResponseRuleUpsertRequest(BaseModel):
+    rule_id: str
+    action: str
+    enabled: bool = True
+
+
+class ResponseRuleOut(BaseModel):
+    rule_id: str
+    action: str
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+
+class ResponseCommandOut(BaseModel):
+    id: str
+    cluster_id: str
+    namespace: str
+    pod_name: str
+    action: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
+class CommandStatusUpdateRequest(BaseModel):
+    status: str

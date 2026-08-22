@@ -31,6 +31,15 @@ class ResponseRule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    def to_dict(self) -> dict:
+        return {
+            "rule_id": self.rule_id,
+            "action": self.action,
+            "enabled": self.enabled,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
 
 class ResponseCommand(Base):
     """One containment action queued for exactly one cluster. The
@@ -53,3 +62,15 @@ class ResponseCommand(Base):
     idempotency_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "cluster_id": self.cluster_id,
+            "namespace": self.namespace,
+            "pod_name": self.pod_name,
+            "action": self.action,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
