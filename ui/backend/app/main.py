@@ -38,11 +38,18 @@ from .runtimedefender.containment_store import (
     upsert_response_rule,
 )
 from .runtimedefender.coverage_store import (
+    InvalidAccountId,
     UnknownCoverageStatus,
     get_cluster_coverage,
+    list_aws_account_coverage,
     list_cluster_coverage,
     record_responder_heartbeat,
+    register_aws_account,
+    report_aws_account_assume_role,
+    report_falco_daemonset_health,
+    report_kill_process_capability,
     report_network_policy_enforcement,
+    report_quarantine_node_capability,
 )
 from .runtimedefender.falco_ingest import parse_falco_alert
 from .runtimedefender.install_script import build_install_script
@@ -50,14 +57,19 @@ from .runtimedefender.responder_install_script import build_responder_install_sc
 from .runtimedefender.runtime_defender import ClusterNotFound, InvalidInstallToken, MalformedFalcoAlert
 from .runtimedefender.runtime_defender import manager as runtime_defender_manager
 from .schemas import (
+    AwsAccountAssumeRoleReportRequest,
+    AwsAccountCoverageOut,
+    AwsAccountRegisterRequest,
     BatchDetail,
     BatchSummary,
+    CapabilityCoverageReportRequest,
     ClusterCoverageOut,
     CodeScanDetail,
     CodeScanFromRepoRequest,
     CodeScanSummary,
     CommandStatusUpdateRequest,
     DastRequest,
+    FalcoCoverageReportRequest,
     JobDetail,
     JobSummary,
     NetworkPolicyCoverageReportRequest,
@@ -873,3 +885,90 @@ def list_runtime_coverage():
     list_commands_for_iam_component does)."""
     with db.session_scope() as session:
         return [c.to_dict() for c in list_cluster_coverage(session)]
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/coverage/falco", status_code=204)
+def report_runtime_cluster_falco_coverage(cluster_id: str, token: str, req: FalcoCoverageReportRequest):
+    """Reported every poll cycle by the responder itself -- a DaemonSet
+    status read, unlike the network-policy canary, so there's no reason
+    to throttle it the way that deliberately-disruptive test is."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            report_falco_daemonset_health(session, cluster_id, req.status, ready=req.ready, desired=req.desired)
+        except UnknownCoverageStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/coverage/kill-process-capability", status_code=204)
+def report_runtime_cluster_kill_process_capability(cluster_id: str, token: str, req: CapabilityCoverageReportRequest):
+    """`kubectl auth can-i delete pods`, reported by the responder -- a
+    non-destructive RBAC presence check, not a test against a real
+    workload."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            report_kill_process_capability(session, cluster_id, req.status)
+        except UnknownCoverageStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+@app.post("/api/runtime-clusters/{cluster_id}/coverage/quarantine-node-capability", status_code=204)
+def report_runtime_cluster_quarantine_node_capability(
+    cluster_id: str, token: str, req: CapabilityCoverageReportRequest
+):
+    """`kubectl auth can-i patch nodes`, reported by the responder --
+    same non-destructive shape as the kill_process capability check,
+    never a real cordon/taint against an actual node."""
+    _authenticated_cluster(cluster_id, token)
+    with db.session_scope() as session:
+        try:
+            report_quarantine_node_capability(session, cluster_id, req.status)
+        except UnknownCoverageStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------
+# AWS account coverage (Tier 4 only). Registration is a plain operator
+# action (no auth beyond what every other dashboard route has); reporting
+# a test-assume result is restricted to iam-responder/'s own fleet-wide
+# credential -- the only component that ever actually attempts the
+# assumption this tracks.
+# ---------------------------------------------------------------------
+@app.post("/api/aws-accounts", response_model=AwsAccountCoverageOut)
+def register_runtime_aws_account(req: AwsAccountRegisterRequest):
+    """An operator's explicit "start tracking this account" call -- see
+    coverage_store.register_aws_account for why this can't be
+    auto-discovered from incidents already seen."""
+    with db.session_scope() as session:
+        try:
+            account = register_aws_account(session, req.account_id)
+        except InvalidAccountId as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return account.to_dict()
+
+
+@app.get("/api/aws-accounts", response_model=list[AwsAccountCoverageOut])
+def list_runtime_aws_accounts():
+    """Also what iam-responder/'s own periodic sweep polls to learn which
+    accounts to test-assume into -- see iam-responder/README.md."""
+    with db.session_scope() as session:
+        return [a.to_dict() for a in list_aws_account_coverage(session)]
+
+
+@app.post("/api/aws-accounts/{account_id}/coverage", status_code=204)
+def report_runtime_aws_account_coverage(
+    account_id: str, req: AwsAccountAssumeRoleReportRequest, authorization: str | None = Header(default=None)
+):
+    _authenticated_iam_component(authorization)
+    with db.session_scope() as session:
+        try:
+            report_aws_account_assume_role(session, account_id, req.status)
+        except UnknownCoverageStatus as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except InvalidAccountId as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(status_code=204)

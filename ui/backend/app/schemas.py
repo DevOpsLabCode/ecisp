@@ -232,8 +232,41 @@ class ClusterCoverageOut(BaseModel):
     responder_last_seen_at: str | None = None
     network_policy_enforcement: str
     network_policy_checked_at: str | None = None
+    falco_daemonset_status: str
+    falco_daemonset_ready: int | None = None
+    falco_daemonset_desired: int | None = None
+    falco_checked_at: str | None = None
+    kill_process_capability: str
+    kill_process_checked_at: str | None = None
+    quarantine_node_capability: str
+    quarantine_node_checked_at: str | None = None
     updated_at: str
 
 
 class NetworkPolicyCoverageReportRequest(BaseModel):
+    status: str
+
+
+class FalcoCoverageReportRequest(BaseModel):
+    status: str
+    ready: int | None = None
+    desired: int | None = None
+
+
+class CapabilityCoverageReportRequest(BaseModel):
+    status: str
+
+
+class AwsAccountRegisterRequest(BaseModel):
+    account_id: str
+
+
+class AwsAccountCoverageOut(BaseModel):
+    account_id: str
+    assume_role_status: str
+    checked_at: str | None = None
+    updated_at: str
+
+
+class AwsAccountAssumeRoleReportRequest(BaseModel):
     status: str

@@ -34,6 +34,12 @@ def _create_cluster(name: str = "prod-eks") -> tuple[str, str]:
     return body["id"], body["install_token"]
 
 
+@pytest.fixture
+def isolated_iam_key(monkeypatch):
+    monkeypatch.setattr(main, "IAM_RESPONDER_API_KEY", "test-iam-responder-key")
+    return "test-iam-responder-key"
+
+
 # ---- responder heartbeat, via the existing poll route ----------------------
 
 
@@ -137,3 +143,181 @@ def test_coverage_can_regress_from_verified_to_failed(isolated_manager, isolated
 
     coverage = client.get(f"/api/runtime-clusters/{cluster_id}/coverage").json()
     assert coverage["network_policy_enforcement"] == "failed"
+
+
+# ---- Falco DaemonSet health -------------------------------------------
+
+
+def test_report_falco_coverage_healthy(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/falco?token={token}",
+        json={"status": "healthy", "ready": 5, "desired": 5},
+    )
+    assert resp.status_code == 204
+
+    coverage = client.get(f"/api/runtime-clusters/{cluster_id}/coverage").json()
+    assert coverage["falco_daemonset_status"] == "healthy"
+    assert coverage["falco_daemonset_ready"] == 5
+    assert coverage["falco_daemonset_desired"] == 5
+    assert coverage["falco_checked_at"] is not None
+
+
+def test_report_falco_coverage_without_counts(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/falco?token={token}", json={"status": "unknown"}
+    )
+    assert resp.status_code == 204
+
+    coverage = client.get(f"/api/runtime-clusters/{cluster_id}/coverage").json()
+    assert coverage["falco_daemonset_ready"] is None
+
+
+def test_report_falco_coverage_rejects_wrong_cluster_token(isolated_manager, isolated_db):
+    cluster_id, _token = _create_cluster()
+    _other_id, other_token = _create_cluster("other-cluster")
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/falco?token={other_token}", json={"status": "healthy"}
+    )
+    assert resp.status_code == 401
+
+
+def test_report_falco_coverage_rejects_unknown_status(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/falco?token={token}", json={"status": "sort-of-healthy"}
+    )
+    assert resp.status_code == 400
+
+
+# ---- kill_process / quarantine_node capability -------------------------
+
+
+def test_report_kill_process_capability_coverage(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/kill-process-capability?token={token}",
+        json={"status": "verified"},
+    )
+    assert resp.status_code == 204
+
+    coverage = client.get(f"/api/runtime-clusters/{cluster_id}/coverage").json()
+    assert coverage["kill_process_capability"] == "verified"
+    assert coverage["kill_process_checked_at"] is not None
+
+
+def test_report_kill_process_capability_rejects_unknown_status(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/kill-process-capability?token={token}",
+        json={"status": "maybe"},
+    )
+    assert resp.status_code == 400
+
+
+def test_report_quarantine_node_capability_coverage(isolated_manager, isolated_db):
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/quarantine-node-capability?token={token}",
+        json={"status": "failed"},
+    )
+    assert resp.status_code == 204
+
+    coverage = client.get(f"/api/runtime-clusters/{cluster_id}/coverage").json()
+    assert coverage["quarantine_node_capability"] == "failed"
+
+
+def test_report_quarantine_node_capability_rejects_wrong_cluster_token(isolated_manager, isolated_db):
+    cluster_id, _token = _create_cluster()
+    _other_id, other_token = _create_cluster("other-cluster")
+
+    resp = client.post(
+        f"/api/runtime-clusters/{cluster_id}/coverage/quarantine-node-capability?token={other_token}",
+        json={"status": "verified"},
+    )
+    assert resp.status_code == 401
+
+
+# ---- AWS account coverage (Tier 4) --------------------------------------
+
+
+def test_register_aws_account(isolated_manager, isolated_db):
+    resp = client.post("/api/aws-accounts", json={"account_id": "123456789012"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["account_id"] == "123456789012"
+    assert body["assume_role_status"] == "unverified"
+
+
+def test_register_aws_account_rejects_invalid_id(isolated_manager, isolated_db):
+    resp = client.post("/api/aws-accounts", json={"account_id": "not-an-account"})
+    assert resp.status_code == 400
+
+
+def test_list_aws_accounts(isolated_manager, isolated_db):
+    client.post("/api/aws-accounts", json={"account_id": "222222222222"})
+    client.post("/api/aws-accounts", json={"account_id": "111111111111"})
+
+    resp = client.get("/api/aws-accounts")
+    assert resp.status_code == 200
+    ids = [a["account_id"] for a in resp.json()]
+    assert ids == ["111111111111", "222222222222"]
+
+
+def test_report_aws_account_coverage_requires_iam_component_auth(isolated_manager, isolated_db, isolated_iam_key):
+    client.post("/api/aws-accounts", json={"account_id": "123456789012"})
+
+    resp = client.post("/api/aws-accounts/123456789012/coverage", json={"status": "verified"})
+    assert resp.status_code == 401
+
+
+def test_report_aws_account_coverage_503_when_key_unconfigured(isolated_manager, isolated_db):
+    resp = client.post(
+        "/api/aws-accounts/123456789012/coverage",
+        headers={"Authorization": "Bearer anything"},
+        json={"status": "verified"},
+    )
+    assert resp.status_code == 503
+
+
+def test_report_aws_account_coverage_verified(isolated_manager, isolated_db, isolated_iam_key):
+    client.post("/api/aws-accounts", json={"account_id": "123456789012"})
+
+    resp = client.post(
+        "/api/aws-accounts/123456789012/coverage",
+        headers={"Authorization": f"Bearer {isolated_iam_key}"},
+        json={"status": "verified"},
+    )
+    assert resp.status_code == 204
+
+    accounts = client.get("/api/aws-accounts").json()
+    assert accounts[0]["assume_role_status"] == "verified"
+    assert accounts[0]["checked_at"] is not None
+
+
+def test_report_aws_account_coverage_404_for_unregistered_account(isolated_manager, isolated_db, isolated_iam_key):
+    resp = client.post(
+        "/api/aws-accounts/999999999999/coverage",
+        headers={"Authorization": f"Bearer {isolated_iam_key}"},
+        json={"status": "verified"},
+    )
+    assert resp.status_code == 404
+
+
+def test_report_aws_account_coverage_rejects_unknown_status(isolated_manager, isolated_db, isolated_iam_key):
+    client.post("/api/aws-accounts", json={"account_id": "123456789012"})
+
+    resp = client.post(
+        "/api/aws-accounts/123456789012/coverage",
+        headers={"Authorization": f"Bearer {isolated_iam_key}"},
+        json={"status": "sort-of-works"},
+    )
+    assert resp.status_code == 400
