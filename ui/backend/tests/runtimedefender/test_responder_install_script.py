@@ -24,17 +24,18 @@ def test_build_responder_install_script_includes_the_cluster_name():
     assert "production-eks" in script
 
 
-def test_build_responder_install_script_cluster_role_covers_four_resource_kinds():
+def test_build_responder_install_script_cluster_role_covers_five_resource_kinds():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     cluster_role = script[script.index("kind: ClusterRole\n") : script.index("kind: ClusterRoleBinding\n")]
     assert 'resources: ["pods"]' in cluster_role
     assert 'resources: ["nodes"]' in cluster_role
     assert 'resources: ["serviceaccounts"]' in cluster_role
     assert 'resources: ["networkpolicies"]' in cluster_role
+    assert 'resources: ["selfsubjectaccessreviews"]' in cluster_role
     # Nothing else in the ClusterRole -- the canary's extra pods/pods-exec
-    # verbs live in a separate, namespaced Role instead (see the
-    # canary_rbac_is_namespaced test below), deliberately not added here.
-    assert cluster_role.count("resources:") == 4
+    # verbs and the Falco health check's daemonsets read both live in
+    # separate, namespaced Roles instead, deliberately not added here.
+    assert cluster_role.count("resources:") == 5
 
 
 def test_build_responder_install_script_uses_a_cluster_role_not_a_namespaced_role():
@@ -161,3 +162,45 @@ def test_build_responder_install_script_canary_role_grants_create_and_exec():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     assert 'verbs: ["create", "get", "list", "delete"]' in script
     assert 'resources: ["pods/exec"]\n    verbs: ["create"]' in script
+
+
+# ---- coverage: Falco health + capability checks (Phase 2) ------------------
+
+
+def test_build_responder_install_script_checks_falco_daemonset_health():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "kubectl get daemonset falco -n falco" in script
+    assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/falco" in script
+
+
+def test_build_responder_install_script_falco_role_is_namespaced_to_falco():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "namespace: falco" in script
+    assert 'resources: ["daemonsets"]\n    verbs: ["get"]' in script
+
+
+def test_build_responder_install_script_checks_kill_process_capability_via_auth_can_i():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "kubectl auth can-i delete pods" in script
+    assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/kill-process-capability" in script
+
+
+def test_build_responder_install_script_checks_quarantine_node_capability_via_auth_can_i():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "kubectl auth can-i patch nodes" in script
+    assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/quarantine-node-capability" in script
+
+
+def test_build_responder_install_script_grants_selfsubjectaccessreviews_create():
+    # kubectl auth can-i itself creates a SelfSubjectAccessReview -- the
+    # capability checks need this grant just to ask the question.
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert 'resources: ["selfsubjectaccessreviews"]\n    verbs: ["create"]' in script
+
+
+def test_build_responder_install_script_coverage_checks_are_throttled():
+    # Every poll cycle would be needless steady-state load across 300
+    # clusters -- these run roughly once a minute, not every 5s.
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "cycle % 12" in script
+    assert "cycle=$((cycle + 1))" in script

@@ -65,6 +65,27 @@ fails) reports `failed` too, on purpose (see
 shell `trap ... EXIT`, so it fires whether the test passes, fails, or the
 script errors out partway through.
 
+**The other three coverage signals (Falco health, kill_process/
+quarantine_node capability)** run inside the poll loop itself, throttled
+to roughly once a minute (every 12th cycle at the default 5s interval) --
+cheap enough not to need the canary's once-a-day discipline, but not
+worth 300 clusters reporting every 5s either. Falco health is a plain
+`kubectl get daemonset falco -n falco` status read; the two capability
+checks are `kubectl auth can-i delete pods` / `... patch nodes` --
+non-destructive RBAC presence checks, never a real workload/node touched
+the way the network-policy canary does, since a granted verb has no
+CNI-style silent-failure mode to prove separately.
+
+**This introduces a real install-order dependency**: the Falco health
+check's RBAC (below) is a namespaced Role bound in the `falco` namespace,
+which this script does not create -- only Falco's own install (see
+`install_script.py`) does. Installing the responder before Falco means
+this `kubectl apply` fails outright (namespace not found) rather than
+installing everything else and leaving Falco health silently broken --
+consistent with "Requires Runtime Defender (the Falco sensor) already
+installed" already being this script's stated prerequisite, just now
+enforced at install time instead of discovered later.
+
 Deliberately no custom container image to build or publish -- `alpine/k8s`
 already bundles `kubectl`, `curl`, and `jq`, the only three tools the poll
 loop needs, the same "reuse what already exists" choice `install_script.py`
@@ -85,17 +106,23 @@ taint, quarantine_node only -- nodes are cluster-scoped resources, so this
 can't be narrowed to a namespace even in principle), `get` on
 serviceaccounts (revoke_iam's role-ARN resolution only -- no write verbs
 at all, since this file only ever reads the annotation, never touches
-AWS), and `get`/`list`/`create`/`patch`/`delete` on networkpolicies.
+AWS), `get`/`list`/`create`/`patch`/`delete` on networkpolicies, and
+`create` on `selfsubjectaccessreviews` -- the resource `kubectl auth
+can-i` itself creates to answer its question, so the capability checks
+above need this grant just to *ask* whether a verb is allowed, before
+either check ever runs for real.
 
-The canary CronJob's own extra verbs (`create`/`delete` on pods, `create`
-on `pods/exec`) are the one deliberate exception to "cluster-scoped only"
--- granted through a *namespaced* `Role`, not an addition to the
-ClusterRole above, and bound only inside `golem-responder`. The canary
-test only ever creates its own throwaway pods in its own namespace, never
-a customer one, so scoping this narrowly to that one namespace costs
-nothing and meaningfully shrinks what a compromised responder could do
-with `create`/`exec` -- verbs the containment tiers above never needed at
-all.
+Two namespaced exceptions to "cluster-scoped only", each for a reason
+that's genuinely local to one namespace: the canary CronJob's own extra
+verbs (`create`/`delete` on pods, `create` on `pods/exec`), bound only in
+`golem-responder` -- it only ever creates its own throwaway pods in its
+own namespace, never a customer one, so narrowing costs nothing and
+meaningfully shrinks what a compromised responder could do with
+`create`/`exec`, verbs the containment tiers above never needed at all.
+And the Falco health check's `get` on `daemonsets`, bound only in
+`falco` -- there's exactly one DaemonSet this ever needs to read, so
+granting `apps/daemonsets` cluster-wide would reach every other
+DaemonSet on the cluster for zero additional benefit.
 
 No access to any other resource kind, and nothing enqueues a command in the
 first place unless an operator has explicitly opted a Falco rule into
@@ -163,6 +190,9 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["selfsubjectaccessreviews"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -202,6 +232,30 @@ subjects:
 roleRef:
   kind: Role
   name: golem-responder-canary
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: golem-responder-falco-health
+  namespace: falco
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: golem-responder-falco-health
+  namespace: falco
+subjects:
+  - kind: ServiceAccount
+    name: golem-responder
+    namespace: golem-responder
+roleRef:
+  kind: Role
+  name: golem-responder-falco-health
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
@@ -262,9 +316,71 @@ spec:
                   "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands/${2}/status" >/dev/null 2>&1 || true
               }
 
+              report_falco_health() {
+                status="$1"
+                ready="$2"
+                desired="$3"
+                if [ -n "${ready}" ]; then
+                  body="{\\"status\\": \\"${status}\\", \\"ready\\": ${ready}, \\"desired\\": ${desired}}"
+                else
+                  body="{\\"status\\": \\"${status}\\"}"
+                fi
+                curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                  -d "${body}" \\
+                  "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/falco" >/dev/null 2>&1 || true
+              }
+
+              check_falco_health() {
+                falco_json=$(kubectl get daemonset falco -n falco -o json 2>/dev/null || true)
+                if [ -z "${falco_json}" ]; then
+                  report_falco_health "unknown" "" ""
+                  return
+                fi
+                ready=$(echo "${falco_json}" | jq -r '.status.numberReady // 0')
+                desired=$(echo "${falco_json}" | jq -r '.status.desiredNumberScheduled // 0')
+                if [ "${desired}" -gt 0 ] && [ "${ready}" = "${desired}" ]; then
+                  report_falco_health "healthy" "${ready}" "${desired}"
+                elif [ "${desired}" -gt 0 ]; then
+                  report_falco_health "degraded" "${ready}" "${desired}"
+                else
+                  report_falco_health "unknown" "" ""
+                fi
+              }
+
+              check_kill_process_capability() {
+                status="failed"
+                kubectl auth can-i delete pods >/dev/null 2>&1 && status="verified"
+                curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                  -d "{\\"status\\": \\"${status}\\"}" \\
+                  "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/kill-process-capability" \\
+                  >/dev/null 2>&1 || true
+              }
+
+              check_quarantine_node_capability() {
+                status="failed"
+                kubectl auth can-i patch nodes >/dev/null 2>&1 && status="verified"
+                curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                  -d "{\\"status\\": \\"${status}\\"}" \\
+                  "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/quarantine-node-capability" \\
+                  >/dev/null 2>&1 || true
+              }
+
+              cycle=0
               while true; do
                 commands=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \\
                   "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/commands" || echo '[]')
+
+                # Throttled to roughly once a minute (12 cycles at the
+                # default 5s poll interval) -- these are cheap, low-risk
+                # reads/no-op checks, but 300 clusters reporting every 5s
+                # would still be needless steady-state load on the backend
+                # for signals that don't need sub-minute freshness.
+                cycle=$((cycle + 1))
+                if [ $((cycle % 12)) -eq 0 ]; then
+                  check_falco_health
+                  check_kill_process_capability
+                  check_quarantine_node_capability
+                fi
 
                 echo "${commands}" | jq -c '.[]' 2>/dev/null | while IFS= read -r cmd; do
                   id=$(echo "${cmd}" | jq -r '.id')
