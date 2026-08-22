@@ -79,3 +79,15 @@ report-*
 .env
 .env.*
 !.env.example
+
+# Terraform runtime files -- generated locally by `terraform init`/`plan`/
+# `test`, never committed (root stacks commit their own .terraform.lock.hcl
+# once one exists; the modules under terraform/modules/ are consumed by a
+# root, not applied standalone, so they don't carry their own lock file).
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+*.tfvars.json
+.terraform.lock.hcl.backup
