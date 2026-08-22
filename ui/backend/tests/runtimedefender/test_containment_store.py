@@ -207,6 +207,18 @@ def test_request_release_rejects_a_kill_process_command_even_when_applied(sessio
         request_release(session, command.id)
 
 
+def test_request_release_rejects_a_quarantine_node_command_even_when_applied(session):
+    command = enqueue_command(
+        session, cluster_id="c1", namespace="default", pod_name="pod-a", action="quarantine_node"
+    )
+    session.commit()
+    update_command_status(session, command.id, "applied")
+    session.commit()
+
+    with pytest.raises(InvalidCommandTransition):
+        request_release(session, command.id)
+
+
 def test_request_release_raises_for_unknown_command_id(session):
     with pytest.raises(CommandNotFound):
         request_release(session, "does-not-exist")

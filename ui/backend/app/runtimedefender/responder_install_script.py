@@ -2,9 +2,11 @@
 responder: a small poll loop that asks Golem for pending containment
 commands scoped to this one cluster, and acts on them -- isolate_network
 applies/reverses a NetworkPolicy, kill_process deletes the offending pod
-outright. See the containment build plan for why this is pull-based (the
-responder reaches out to the backend, never the other way around) and why
-its Kubernetes RBAC is the narrowest grant that can do the job.
+outright, quarantine_node cordons and taints the node the pod is running
+on before deleting the pod. See the containment build plan for why this
+is pull-based (the responder reaches out to the backend, never the other
+way around) and why its Kubernetes RBAC is the narrowest grant that can
+do the job.
 
 **Why kill_process is `kubectl delete pod`, not a real eBPF process kill**:
 the plan's original design leaned toward Tetragon, but Tetragon's
@@ -16,6 +18,17 @@ less proven pattern than NetworkPolicy-per-pod. Deleting the whole pod is
 coarser (it takes every container in the pod down, not one surgical
 process), but reuses the exact same responder this file already has, and
 in practice most workloads are one-process-per-container anyway.
+
+**Why quarantine_node cordons (not taints `NoExecute`) and only evicts the
+one named pod**: a `NoExecute` taint evicts *every* pod already running on
+that node, not just the one Falco flagged -- a much larger blast radius
+than the finding justifies on a shared, multi-tenant node. `cordon` (plus
+a `NoSchedule` taint, kept mainly for an auditable record of *why* the
+node is cordoned) only stops *new* pods from landing there; the flagged
+pod itself is removed with the same direct delete kill_process already
+uses, not the Eviction API -- an actively compromised workload shouldn't
+wait on PodDisruptionBudget negotiation the way a routine maintenance
+drain should.
 
 Deliberately no custom container image to build or publish -- `alpine/k8s`
 already bundles `kubectl`, `curl`, and `jq`, the only three tools the poll
@@ -30,11 +43,13 @@ RBAC has to be cluster-scoped even though it's still as narrow as possible
 on verbs: `get`/`list`/`patch`/`delete` on pods (patch to attach the
 one-off isolation label a NetworkPolicy's `podSelector` needs -- Kubernetes
 has no way to select a NetworkPolicy target by pod name directly; delete
-for kill_process), and `get`/`list`/`create`/`patch`/`delete` on
-networkpolicies. No access to any other resource kind, and nothing
-enqueues a command in the first place unless an operator has explicitly
-opted a Falco rule into that specific action (see
-`containment_store.upsert_response_rule`).
+for kill_process and quarantine_node), `get`/`patch` on nodes (cordon and
+taint, quarantine_node only -- nodes are cluster-scoped resources, so this
+can't be narrowed to a namespace even in principle), and
+`get`/`list`/`create`/`patch`/`delete` on networkpolicies. No access to any
+other resource kind, and nothing enqueues a command in the first place
+unless an operator has explicitly opted a Falco rule into that specific
+action (see `containment_store.upsert_response_rule`).
 
 **Why token substitution instead of `.format()`**: unlike
 `install_script.py`'s template, this one is mostly shell (`${VAR}`
@@ -89,6 +104,9 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "patch"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "create", "patch", "delete"]
@@ -191,6 +209,18 @@ spec:
 
                   elif [ "${status}" = "pending" ] && [ "${action}" = "kill_process" ]; then
                     if kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force >/dev/null 2>&1; then
+                      report_status "applied" "${id}"
+                    else
+                      report_status "failed" "${id}"
+                    fi
+
+                  elif [ "${status}" = "pending" ] && [ "${action}" = "quarantine_node" ]; then
+                    node=$(kubectl get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
+                    if [ -n "${node}" ] \\
+                      && kubectl cordon "${node}" >/dev/null 2>&1 \\
+                      && kubectl taint nodes "${node}" "golem.io/quarantined=${id}:NoSchedule" \\
+                        --overwrite >/dev/null 2>&1 \\
+                      && kubectl delete pod "${pod}" -n "${ns}" --grace-period=0 --force >/dev/null 2>&1; then
                       report_status "applied" "${id}"
                     else
                       report_status "failed" "${id}"

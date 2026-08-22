@@ -298,6 +298,37 @@ def test_release_rejects_an_applied_kill_process_command(isolated_manager, isola
     assert resp.status_code == 409
 
 
+# ---- quarantine_node (Tier 3) ----------------------------------------------
+
+
+def test_ingest_enqueues_a_quarantine_node_command_when_mapped(isolated_manager, isolated_db):
+    client.post(
+        "/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "quarantine_node"}
+    )
+    cluster_id, token = _create_cluster()
+
+    resp = client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    assert resp.status_code == 204
+
+    commands = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()
+    assert len(commands) == 1
+    assert commands[0]["action"] == "quarantine_node"
+    assert commands[0]["status"] == "pending"
+
+
+def test_release_rejects_an_applied_quarantine_node_command(isolated_manager, isolated_db):
+    client.post(
+        "/api/response-rules", json={"rule_id": "Read sensitive file untrusted", "action": "quarantine_node"}
+    )
+    cluster_id, token = _create_cluster()
+    client.post(f"/api/runtime-clusters/{cluster_id}/events?token={token}", json=_REAL_ALERT_PAYLOAD)
+    command_id = client.get(f"/api/runtime-clusters/{cluster_id}/commands?token={token}").json()[0]["id"]
+    _update_status(cluster_id, token, command_id, "applied")
+
+    resp = client.post(f"/api/runtime-clusters/{cluster_id}/commands/{command_id}/release")
+    assert resp.status_code == 409
+
+
 def test_release_404_for_unknown_command(isolated_manager, isolated_db):
     cluster_id, _token = _create_cluster()
     resp = client.post(f"/api/runtime-clusters/{cluster_id}/commands/does-not-exist/release")

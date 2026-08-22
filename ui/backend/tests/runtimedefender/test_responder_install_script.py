@@ -24,12 +24,13 @@ def test_build_responder_install_script_includes_the_cluster_name():
     assert "production-eks" in script
 
 
-def test_build_responder_install_script_scopes_rbac_to_pods_and_networkpolicies_only():
+def test_build_responder_install_script_scopes_rbac_to_exactly_three_resource_kinds():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
     assert 'resources: ["pods"]' in script
+    assert 'resources: ["nodes"]' in script
     assert 'resources: ["networkpolicies"]' in script
-    # Nothing else -- the RBAC grant is exactly these two resource kinds.
-    assert script.count("resources:") == 2
+    # Nothing else -- the RBAC grant is exactly these three resource kinds.
+    assert script.count("resources:") == 3
 
 
 def test_build_responder_install_script_uses_a_cluster_role_not_a_namespaced_role():
@@ -55,3 +56,23 @@ def test_build_responder_install_script_handles_kill_process_via_kubectl_delete_
     assert '"${action}" = "kill_process"' in script
     assert "kubectl delete pod" in script
     assert "--grace-period=0 --force" in script
+
+
+def test_build_responder_install_script_nodes_rbac_is_get_and_patch_only():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert 'resources: ["nodes"]\n    verbs: ["get", "patch"]' in script
+
+
+def test_build_responder_install_script_handles_quarantine_node_via_cordon_taint_and_delete():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert '"${action}" = "quarantine_node"' in script
+    assert "kubectl cordon" in script
+    assert "kubectl taint nodes" in script
+    assert "NoSchedule" in script
+
+
+def test_build_responder_install_script_quarantine_node_never_uses_no_execute():
+    # A NoExecute taint would evict every other pod already on the node,
+    # not just the one Falco flagged -- see the module docstring.
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "NoExecute" not in script
