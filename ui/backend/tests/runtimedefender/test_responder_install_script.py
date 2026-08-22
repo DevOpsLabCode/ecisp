@@ -24,14 +24,17 @@ def test_build_responder_install_script_includes_the_cluster_name():
     assert "production-eks" in script
 
 
-def test_build_responder_install_script_scopes_rbac_to_exactly_four_resource_kinds():
+def test_build_responder_install_script_cluster_role_covers_four_resource_kinds():
     script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
-    assert 'resources: ["pods"]' in script
-    assert 'resources: ["nodes"]' in script
-    assert 'resources: ["serviceaccounts"]' in script
-    assert 'resources: ["networkpolicies"]' in script
-    # Nothing else -- the RBAC grant is exactly these four resource kinds.
-    assert script.count("resources:") == 4
+    cluster_role = script[script.index("kind: ClusterRole\n") : script.index("kind: ClusterRoleBinding\n")]
+    assert 'resources: ["pods"]' in cluster_role
+    assert 'resources: ["nodes"]' in cluster_role
+    assert 'resources: ["serviceaccounts"]' in cluster_role
+    assert 'resources: ["networkpolicies"]' in cluster_role
+    # Nothing else in the ClusterRole -- the canary's extra pods/pods-exec
+    # verbs live in a separate, namespaced Role instead (see the
+    # canary_rbac_is_namespaced test below), deliberately not added here.
+    assert cluster_role.count("resources:") == 4
 
 
 def test_build_responder_install_script_uses_a_cluster_role_not_a_namespaced_role():
@@ -106,3 +109,55 @@ def test_build_responder_install_script_never_calls_aws_apis_directly():
     assert "boto3" not in script
     assert "sts:" not in script
     assert "iam:" not in script
+
+
+# ---- coverage: daily NetworkPolicy-enforcement canary (Phase 2) -----------
+
+
+def test_build_responder_install_script_installs_a_daily_cronjob():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "kind: CronJob" in script
+    assert 'schedule: "0 3 * * *"' in script
+    assert "concurrencyPolicy: Forbid" in script
+
+
+def test_build_responder_install_script_canary_creates_two_pods_and_a_deny_all_policy():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "golem-canary-victim-" in script
+    assert "golem-canary-prober-" in script
+    assert "kubectl run" in script
+    assert "golem-io/canary" in script
+    assert "policyTypes" in script
+
+
+def test_build_responder_install_script_canary_probes_before_and_after_the_policy():
+    # The pre-policy probe is what stops a broken base network from being
+    # misreported as "enforcement verified".
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert script.count("probe") >= 3  # definition + pre-check call + post-policy call
+
+
+def test_build_responder_install_script_canary_reports_to_the_coverage_endpoint():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/network-policy" in script
+
+
+def test_build_responder_install_script_canary_cleanup_uses_a_trap():
+    # Cleanup must run whether the test passes, fails, or errors out
+    # partway through -- a plain end-of-script call wouldn't survive an
+    # early `exit 0` on a failed pre-check.
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "trap cleanup EXIT" in script
+
+
+def test_build_responder_install_script_canary_rbac_is_namespaced_not_cluster_wide():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert "kind: Role\n" in script
+    assert "kind: RoleBinding\n" in script
+    assert 'resources: ["pods/exec"]' in script
+
+
+def test_build_responder_install_script_canary_role_grants_create_and_exec():
+    script = build_responder_install_script("c", "n", "t", "http://localhost:8000")
+    assert 'verbs: ["create", "get", "list", "delete"]' in script
+    assert 'resources: ["pods/exec"]\n    verbs: ["create"]' in script

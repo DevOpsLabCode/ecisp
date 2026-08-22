@@ -45,10 +45,32 @@ uses, not the Eviction API -- an actively compromised workload shouldn't
 wait on PodDisruptionBudget negotiation the way a routine maintenance
 drain should.
 
+**The daily canary CronJob (Phase 2, coverage)**: also installed here,
+because it's what keeps "isolate_network is configured" and
+"isolate_network actually isolates anything" from silently diverging --
+on EKS, the default VPC CNI does not enforce Kubernetes NetworkPolicy at
+all unless explicitly turned on, so an isolation command can apply
+cleanly and do nothing. Once a day it creates two throwaway pods in its
+own `golem-responder` namespace (never a customer namespace) -- a victim
+running a minimal `busybox httpd`, a prober that tries to reach it --
+confirms the prober *can* reach the victim first (so a broken base
+network doesn't get misreported as "enforcement verified" by accident),
+applies a deny-all NetworkPolicy scoped to the victim's pod, waits a
+moment for the CNI to actually apply it, and probes again. Blocked the
+second time means enforcement really works (`verified`); still reachable
+means it doesn't (`failed`) -- and a run that can't reach a clean
+conclusion at all (pods never come up, the pre-policy probe itself
+fails) reports `failed` too, on purpose (see
+`coverage_store.report_network_policy_enforcement`). Cleanup runs from a
+shell `trap ... EXIT`, so it fires whether the test passes, fails, or the
+script errors out partway through.
+
 Deliberately no custom container image to build or publish -- `alpine/k8s`
 already bundles `kubectl`, `curl`, and `jq`, the only three tools the poll
 loop needs, the same "reuse what already exists" choice `install_script.py`
-makes with Falco's own Helm chart.
+makes with Falco's own Helm chart. The canary CronJob reuses the same
+image and the same per-cluster Secret token, needing nothing new to
+build or ship.
 
 **Why a ClusterRole, not a namespaced Role**: the pod a containment command
 names can be in any namespace on the cluster (wherever the workload that
@@ -63,8 +85,19 @@ taint, quarantine_node only -- nodes are cluster-scoped resources, so this
 can't be narrowed to a namespace even in principle), `get` on
 serviceaccounts (revoke_iam's role-ARN resolution only -- no write verbs
 at all, since this file only ever reads the annotation, never touches
-AWS), and `get`/`list`/`create`/`patch`/`delete` on networkpolicies. No
-access to any other resource kind, and nothing enqueues a command in the
+AWS), and `get`/`list`/`create`/`patch`/`delete` on networkpolicies.
+
+The canary CronJob's own extra verbs (`create`/`delete` on pods, `create`
+on `pods/exec`) are the one deliberate exception to "cluster-scoped only"
+-- granted through a *namespaced* `Role`, not an addition to the
+ClusterRole above, and bound only inside `golem-responder`. The canary
+test only ever creates its own throwaway pods in its own namespace, never
+a customer one, so scoping this narrowly to that one namespace costs
+nothing and meaningfully shrinks what a compromised responder could do
+with `create`/`exec` -- verbs the containment tiers above never needed at
+all.
+
+No access to any other resource kind, and nothing enqueues a command in the
 first place unless an operator has explicitly opted a Falco rule into
 that specific action (see `containment_store.upsert_response_rule`).
 
@@ -142,6 +175,33 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: golem-responder
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: golem-responder-canary
+  namespace: golem-responder
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: golem-responder-canary
+  namespace: golem-responder
+subjects:
+  - kind: ServiceAccount
+    name: golem-responder
+    namespace: golem-responder
+roleRef:
+  kind: Role
+  name: golem-responder-canary
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
@@ -278,6 +338,119 @@ spec:
 
                 sleep "${POLL_INTERVAL_SECONDS:-5}"
               done
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: golem-responder-canary
+  namespace: golem-responder
+spec:
+  # Off-peak by default -- change if 3am UTC collides with something else
+  # in this cluster. Kept deliberately far from incident-response-critical
+  # hours; see coverage_store.py for why this exists at all.
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 180
+      template:
+        spec:
+          serviceAccountName: golem-responder
+          restartPolicy: Never
+          containers:
+            - name: canary
+              image: alpine/k8s:1.30.4
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: CLUSTER_ID
+                  value: "__GOLEM_CLUSTER_ID_TOKEN__"
+                - name: BACKEND_URL
+                  value: "__GOLEM_BACKEND_URL_TOKEN__"
+                - name: TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: golem-responder-credentials
+                      key: token
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  ns="golem-responder"
+
+                  ts=$(date +%s)
+                  victim="golem-canary-victim-${ts}"
+                  prober="golem-canary-prober-${ts}"
+                  netpol_name="golem-canary-deny-${ts}"
+
+                  cleanup() {
+                    kubectl delete pod "${victim}" "${prober}" -n "${ns}" --ignore-not-found \\
+                      --grace-period=0 --force >/dev/null 2>&1 || true
+                    kubectl delete networkpolicy "${netpol_name}" -n "${ns}" --ignore-not-found \\
+                      >/dev/null 2>&1 || true
+                  }
+                  trap cleanup EXIT
+
+                  report() {
+                    curl -sf -X POST -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \\
+                      -d "{\\"status\\": \\"${1}\\"}" \\
+                      "${BACKEND_URL}/api/runtime-clusters/${CLUSTER_ID}/coverage/network-policy" \\
+                      >/dev/null 2>&1 || true
+                  }
+
+                  wait_running() {
+                    pod="${1}"
+                    i=0
+                    while [ "${i}" -lt 30 ]; do
+                      phase=$(kubectl get pod "${pod}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+                      [ "${phase}" = "Running" ] && return 0
+                      i=$((i + 1))
+                      sleep 2
+                    done
+                    return 1
+                  }
+
+                  probe() {
+                    victim_ip=$(kubectl get pod "${victim}" -n "${ns}" \\
+                      -o jsonpath='{.status.podIP}' 2>/dev/null || true)
+                    [ -n "${victim_ip}" ] || return 1
+                    kubectl exec "${prober}" -n "${ns}" -- wget -q -T 3 -O /dev/null "http://${victim_ip}:8080/" \\
+                      >/dev/null 2>&1
+                  }
+
+                  kubectl run "${victim}" -n "${ns}" --image=busybox:1.36 --restart=Never \\
+                    --command -- sh -c 'mkdir -p /tmp/www && httpd -f -p 8080 -h /tmp/www' >/dev/null 2>&1
+                  kubectl run "${prober}" -n "${ns}" --image=busybox:1.36 --restart=Never \\
+                    --command -- sleep 300 >/dev/null 2>&1
+
+                  if ! wait_running "${victim}" || ! wait_running "${prober}"; then
+                    report "failed"
+                    exit 0
+                  fi
+
+                  if ! probe; then
+                    report "failed"
+                    exit 0
+                  fi
+
+                  kubectl label pod "${victim}" -n "${ns}" "golem-io/canary=${ts}" --overwrite >/dev/null 2>&1
+
+                  netpol_p1="{\\"apiVersion\\":\\"networking.k8s.io/v1\\",\\"kind\\":\\"NetworkPolicy\\",\\"metadata\\":{\\"name"
+                  netpol_p2="\\":\\"${netpol_name}\\",\\"namespace\\":\\"${ns}\\"},\\"spec\\":{\\"podSelector\\":{\\"matchLabels"
+                  netpol_p3="\\":{\\"golem-io/canary\\":\\"${ts}\\"}},\\"policyTypes\\":[\\"Ingress\\",\\"Egress\\"],\\"ingress\\""
+                  netpol_p4=":[],\\"egress\\":[]}}"
+                  netpol_json="${netpol_p1}${netpol_p2}${netpol_p3}${netpol_p4}"
+                  echo "${netpol_json}" | kubectl apply -f - >/dev/null 2>&1
+
+                  sleep 3
+
+                  if probe; then
+                    report "failed"
+                  else
+                    report "verified"
+                  fi
 GOLEM_RESPONDER_MANIFEST
 
 echo
